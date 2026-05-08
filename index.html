@@ -94,18 +94,57 @@ textarea{resize:vertical;min-height:60px;margin-top:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── Login screen ─────────────────────────────────────────── */
+.login-screen{position:fixed;inset:0;background:var(--bg3);display:flex;align-items:center;justify-content:center;z-index:300;padding:1.5rem}
+.login-box{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-lg);padding:2.5rem 2rem;max-width:360px;width:100%;text-align:center;box-shadow:var(--shadow)}
+.login-icon{font-size:40px;margin-bottom:1rem}
+.login-title{font-size:20px;font-weight:600;margin-bottom:.375rem}
+.login-sub{font-size:13px;color:var(--text2);margin-bottom:2rem;line-height:1.5}
+.btn-google{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:11px 16px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:14px;font-weight:500;color:var(--text);cursor:pointer;transition:background .15s}
+.btn-google:hover{background:var(--bg2)}
+.btn-google:active{transform:scale(.98)}
+.btn-google svg{flex-shrink:0}
+.login-screen.hidden{display:none}
+
+/* ── User avatar in header ───────────────────────────────── */
+.user-area{display:flex;align-items:center;gap:8px}
+.user-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;border:0.5px solid var(--border2)}
+.user-name{font-size:12px;color:var(--text2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:400px){.user-name{display:none}}
+.btn-logout{padding:5px 10px;background:transparent;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;color:var(--text3);cursor:pointer}
+.btn-logout:hover{background:var(--bg2);color:var(--text)}
 </style>
 </head>
 <body>
 
-<div class="app">
+<!-- Tela de login -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <div class="login-icon">✅</div>
+    <div class="login-title">Minhas Tarefas</div>
+    <div class="login-sub">Entre com sua conta Google para acessar suas tarefas de qualquer dispositivo.</div>
+    <button class="btn-google" id="btn-google-login">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/></svg>
+      Entrar com Google
+    </button>
+  </div>
+</div>
+
+<!-- App principal -->
+<div class="app" id="main-app" style="display:none">
   <div class="header">
     <div class="header-top">
       <div>
         <div class="header-title"><i class="ti ti-checkbox" aria-hidden="true"></i>Minhas Tarefas</div>
         <div class="header-date" id="date-label"></div>
       </div>
-      <button class="btn-new" onclick="openModal()"><i class="ti ti-plus" aria-hidden="true"></i>Nova tarefa</button>
+      <div class="user-area">
+        <img class="user-avatar" id="user-avatar" src="" alt="">
+        <span class="user-name" id="user-name"></span>
+        <button class="btn-logout" onclick="doLogout()">Sair</button>
+        <button class="btn-new" onclick="openModal()"><i class="ti ti-plus" aria-hidden="true"></i>Nova tarefa</button>
+      </div>
     </div>
     <div class="stats" id="stats"></div>
     <div class="tabs">
@@ -133,7 +172,7 @@ textarea{resize:vertical;min-height:60px;margin-top:8px}
   </div>
 </div>
 
-<button class="fab" onclick="openModal()" aria-label="Nova tarefa"><i class="ti ti-plus" aria-hidden="true"></i></button>
+<button class="fab" onclick="openModal()" aria-label="Nova tarefa" id="fab"><i class="ti ti-plus" aria-hidden="true"></i></button>
 
 <div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)" role="dialog" aria-modal="true">
   <div class="modal">
@@ -173,35 +212,91 @@ textarea{resize:vertical;min-height:60px;margin-top:8px}
 <div class="toast" id="toast"></div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+import { initializeApp }                                          from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+                                                                  from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
+import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp }
+                                                                  from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
 
+// ── Config ────────────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: "AIzaSyB5dmG3a12WDdE13jzKTfv9C65igNmhveU",
-  authDomain: "birdy---to-do-s.firebaseapp.com",
-  projectId: "birdy---to-do-s",
-  storageBucket: "birdy---to-do-s.firebasestorage.app",
+  apiKey:            "AIzaSyB5dmG3a12WDdE13jzKTfv9C65igNmhveU",
+  authDomain:        "birdy---to-do-s.firebaseapp.com",
+  projectId:         "birdy---to-do-s",
+  storageBucket:     "birdy---to-do-s.firebasestorage.app",
   messagingSenderId: "564307060103",
-  appId: "1:564307060103:web:45f9c3a0b5ba4d14131f22"
+  appId:             "1:564307060103:web:45f9c3a0b5ba4d14131f22"
 };
 
-const fbApp = initializeApp(firebaseConfig);
-const db    = getFirestore(fbApp);
-const COL   = collection(db, "tasks");
+const fbApp   = initializeApp(firebaseConfig);
+const auth    = getAuth(fbApp);
+const db      = getFirestore(fbApp);
+const provider = new GoogleAuthProvider();
 
+// ── State ─────────────────────────────────────────────────────
 const CATS={prazo:{label:'Prazo judicial',icon:'⚖️',cls:'prazo'},contrato:{label:'Contrato',icon:'📄',cls:'contrato'},cartorio:{label:'Cartório',icon:'🏛️',cls:'cartorio'},societario:{label:'Societário',icon:'🏢',cls:'societario'},email:{label:'E-mail',icon:'✉️',cls:'email'},reuniao:{label:'Reunião',icon:'🤝',cls:'reuniao'},outro:{label:'Outro',icon:'📌',cls:'outro'}};
 const PRIO={alta:{color:'#E24B4A'},media:{color:'#BA7517'},baixa:{color:'#B4B2A9'}};
 let tasks=[],view='pending',filterCat='all',sortBy='prio',editId=null;
+let unsubTasks=null;
 
-onSnapshot(COL, snap => {
-  tasks = snap.docs.map(d => ({...d.data(), _id: d.id}));
-  setSyncStatus('ok','Sincronizado');
-  render();
-}, err => {
-  console.error(err);
-  setSyncStatus('err','Erro de conexão');
+// ── Auth ──────────────────────────────────────────────────────
+onAuthStateChanged(auth, user => {
+  if (user) {
+    // Logado
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('main-app').style.display = '';
+    document.getElementById('fab').style.display = '';
+    document.getElementById('user-name').textContent   = user.displayName || user.email;
+    document.getElementById('user-avatar').src         = user.photoURL || '';
+    document.getElementById('user-avatar').style.display = user.photoURL ? '' : 'none';
+    startListening(user.uid);
+  } else {
+    // Deslogado
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('main-app').style.display = 'none';
+    document.getElementById('fab').style.display = 'none';
+    if (unsubTasks) { unsubTasks(); unsubTasks = null; }
+    tasks = [];
+  }
 });
 
+document.getElementById('btn-google-login').addEventListener('click', async () => {
+  try {
+    await signInWithPopup(auth, provider);
+  } catch(e) {
+    console.error(e);
+    showToast('Erro ao fazer login. Tente novamente.');
+  }
+});
+
+window.doLogout = async function() {
+  await signOut(auth);
+};
+
+// ── Firestore — listener por usuário ─────────────────────────
+function startListening(uid) {
+  if (unsubTasks) unsubTasks();
+  const COL = collection(db, 'users', uid, 'tasks');
+  unsubTasks = onSnapshot(COL,
+    snap => {
+      tasks = snap.docs.map(d => ({...d.data(), _id: d.id, _col: COL}));
+      setSyncStatus('ok', 'Sincronizado');
+      render();
+    },
+    err => {
+      console.error(err);
+      setSyncStatus('err', 'Erro de conexão');
+    }
+  );
+}
+
+function getUserCol() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return null;
+  return collection(db, 'users', uid, 'tasks');
+}
+
+// ── Helpers ───────────────────────────────────────────────────
 function today(){return new Date().toISOString().slice(0,10)}
 function fmtDate(d){if(!d)return null;const[y,m,dd]=d.split('-');return`${dd}/${m}/${y}`}
 function dateStatus(d){if(!d)return null;const t=today();if(d<t)return'overdue';if(d===t)return'today';if((new Date(d)-new Date(t))/86400000<=3)return'soon';return'normal'}
@@ -209,6 +304,7 @@ function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace
 function setSyncStatus(state,label){document.getElementById('sync-dot').className='sync-dot '+state;document.getElementById('sync-label').textContent=label}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
 
+// ── Modal ─────────────────────────────────────────────────────
 window.openModal=function(id){
   editId=id||null;const t=id?tasks.find(x=>x._id===id):null;
   document.getElementById('modal-title-el').textContent=id?'Editar tarefa':'Nova tarefa';
@@ -223,32 +319,46 @@ window.openModal=function(id){
 };
 window.closeModal=function(){document.getElementById('modal-overlay').classList.remove('open');editId=null};
 window.handleOverlayClick=function(e){if(e.target.id==='modal-overlay')closeModal()};
+
 window.saveModal=async function(){
   const title=document.getElementById('m-title').value.trim();
   if(!title){document.getElementById('m-title').focus();return}
+  const COL=getUserCol(); if(!COL)return;
   const btn=document.getElementById('modal-save-btn');
   btn.classList.add('loading');
   const data={title,cat:document.getElementById('m-cat').value,prio:document.getElementById('m-prio').value,date:document.getElementById('m-date').value,note:document.getElementById('m-note').value.trim()};
   try{
-    if(editId){await updateDoc(doc(db,'tasks',editId),data);showToast('Tarefa atualizada')}
-    else{data.done=false;data.doneAt=null;data.added=serverTimestamp();await addDoc(COL,data);showToast('Tarefa adicionada')}
+    if(editId){
+      await updateDoc(doc(db,'users',auth.currentUser.uid,'tasks',editId),data);
+      showToast('Tarefa atualizada');
+    }else{
+      data.done=false;data.doneAt=null;data.added=serverTimestamp();
+      await addDoc(COL,data);
+      showToast('Tarefa adicionada');
+    }
     closeModal();
   }catch(e){console.error(e);showToast('Erro ao salvar. Tente novamente.')}
   finally{btn.classList.remove('loading')}
 };
+
 window.toggleDone=async function(id){
   const t=tasks.find(x=>x._id===id);if(!t)return;
   const done=!t.done;
-  try{await updateDoc(doc(db,'tasks',id),{done,doneAt:done?Date.now():null})}
+  try{await updateDoc(doc(db,'users',auth.currentUser.uid,'tasks',id),{done,doneAt:done?Date.now():null})}
   catch(e){showToast('Erro ao atualizar.')}
 };
+
 window.deleteTask=async function(id){
   if(!confirm('Excluir esta tarefa?'))return;
-  try{await deleteDoc(doc(db,'tasks',id));showToast('Tarefa excluída')}
-  catch(e){showToast('Erro ao excluir.')}
+  try{
+    await deleteDoc(doc(db,'users',auth.currentUser.uid,'tasks',id));
+    showToast('Tarefa excluída');
+  }catch(e){showToast('Erro ao excluir.')}
 };
+
 window.setView=function(v){view=v;['pending','today','done'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('active',x===v));render()};
 
+// ── Render ────────────────────────────────────────────────────
 function getVisible(){
   let list=tasks.filter(t=>{if(view==='pending')return!t.done;if(view==='done')return t.done;const s=dateStatus(t.date);return!t.done&&(s==='overdue'||s==='today'||s==='soon'||t.prio==='alta')});
   if(filterCat!=='all')list=list.filter(t=>t.cat===filterCat);
@@ -287,6 +397,7 @@ function renderList(){
 }
 window.render=function(){renderStats();renderFilters();renderList()};
 
+// ── Data label ────────────────────────────────────────────────
 (function(){const d=new Date();const dias=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];const meses=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];document.getElementById('date-label').textContent=`${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`})();
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 render();
