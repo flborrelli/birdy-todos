@@ -16,3 +16,4 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           projectId: birdy---to-do-s
           target: app
+          channelId: live
