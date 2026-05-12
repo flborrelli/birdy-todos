@@ -1,131 +1,66 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#ffffff">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>Tarefas — Exto</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
-<style>
-:root{--bg:#ffffff;--bg2:#f5f5f3;--bg3:#eeede9;--text:#1a1a18;--text2:#6b6b67;--text3:#a0a09a;--border:rgba(0,0,0,0.10);--border2:rgba(0,0,0,0.18);--radius:10px;--radius-lg:14px;--shadow:0 1px 3px rgba(0,0,0,0.07),0 4px 16px rgba(0,0,0,0.05);--font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--prazo-bg:#EEEDFE;--prazo-c:#3C3489;--prazo-bd:#AFA9EC;--prazo-sel:#534AB7;--contrato-bg:#E6F1FB;--contrato-c:#0C447C;--contrato-bd:#85B7EB;--contrato-sel:#185FA5;--cartorio-bg:#FAEEDA;--cartorio-c:#633806;--cartorio-bd:#EF9F27;--cartorio-sel:#BA7517;--societario-bg:#FBEAF0;--societario-c:#72243E;--societario-bd:#ED93B1;--societario-sel:#993556;--email-bg:#EAF3DE;--email-c:#27500A;--email-bd:#97C459;--email-sel:#3B6D11;--reuniao-bg:#FAECE7;--reuniao-c:#712B13;--reuniao-bd:#F0997B;--reuniao-sel:#993C1D;--outro-bg:#F1EFE8;--outro-c:#444441;--outro-bd:#B4B2A9;--outro-sel:#5F5E5A;--red:#E24B4A;--amber:#BA7517;--green:#3B6D11}
-@media(prefers-color-scheme:dark){:root{--bg:#1c1c1a;--bg2:#252523;--bg3:#2e2e2b;--text:#f0efe8;--text2:#9a9a94;--text3:#6b6b66;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.15);--prazo-bg:#26215C;--prazo-c:#CECBF6;--contrato-bg:#042C53;--contrato-c:#B5D4F4;--cartorio-bg:#412402;--cartorio-c:#FAC775;--societario-bg:#4B1528;--societario-c:#F4C0D1;--email-bg:#173404;--email-c:#C0DD97;--reuniao-bg:#4A1B0C;--reuniao-c:#F5C4B3;--outro-bg:#2C2C2A;--outro-c:#D3D1C7}}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{font-size:16px;-webkit-text-size-adjust:100%}
-body{font-family:var(--font);background:var(--bg3);color:var(--text);min-height:100dvh}
-.app{max-width:680px;margin:0 auto;padding:0 0 6rem}
-@media(min-width:700px){.app{padding-top:1.5rem}}
-.header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:1rem 1.25rem 0;position:sticky;top:0;z-index:50}
-@media(min-width:700px){.header{border-radius:var(--radius-lg) var(--radius-lg) 0 0;border:0.5px solid var(--border);border-bottom:none}}
-.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem}
-.header-title{font-size:17px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
-.header-date{font-size:12px;color:var(--text3);margin-top:1px}
-.btn-new{display:flex;align-items:center;gap:5px;padding:7px 14px;background:var(--text);color:var(--bg);border:none;border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer}
-.btn-new:active{opacity:.8}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:1rem}
-.stat{background:var(--bg2);border-radius:var(--radius);padding:.625rem .5rem;text-align:center}
-.stat-n{font-size:20px;font-weight:600;color:var(--text);line-height:1}
-.stat-n.red{color:var(--red)}.stat-n.amber{color:var(--amber)}.stat-n.green{color:var(--green)}
-.stat-l{font-size:10px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:.3px}
-.tabs{display:flex;border-top:0.5px solid var(--border)}
-.tab{flex:1;padding:10px 6px 9px;border:none;background:transparent;font-size:13px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;display:flex;align-items:center;justify-content:center;gap:5px}
-.tab.active{color:var(--text);border-bottom-color:var(--text);font-weight:500}
-.content{background:var(--bg);border:0.5px solid var(--border);border-top:none;padding:1rem 1.25rem}
-@media(min-width:700px){.content{border-radius:0 0 var(--radius-lg) var(--radius-lg)}}
-.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.875rem}
-.chip{padding:4px 10px;border-radius:20px;font-size:12px;cursor:pointer;border:0.5px solid transparent;user-select:none}
-.chip.all{background:var(--bg2);color:var(--text2);border-color:var(--border2)}.chip.all.sel{background:var(--text);color:var(--bg)}
-.chip.prazo{background:var(--prazo-bg);color:var(--prazo-c);border-color:var(--prazo-bd)}.chip.prazo.sel{background:var(--prazo-sel);color:#fff}
-.chip.contrato{background:var(--contrato-bg);color:var(--contrato-c);border-color:var(--contrato-bd)}.chip.contrato.sel{background:var(--contrato-sel);color:#fff}
-.chip.cartorio{background:var(--cartorio-bg);color:var(--cartorio-c);border-color:var(--cartorio-bd)}.chip.cartorio.sel{background:var(--cartorio-sel);color:#fff}
-.chip.societario{background:var(--societario-bg);color:var(--societario-c);border-color:var(--societario-bd)}.chip.societario.sel{background:var(--societario-sel);color:#fff}
-.chip.email{background:var(--email-bg);color:var(--email-c);border-color:var(--email-bd)}.chip.email.sel{background:var(--email-sel);color:#fff}
-.chip.reuniao{background:var(--reuniao-bg);color:var(--reuniao-c);border-color:var(--reuniao-bd)}.chip.reuniao.sel{background:var(--reuniao-sel);color:#fff}
-.chip.outro{background:var(--outro-bg);color:var(--outro-c);border-color:var(--outro-bd)}.chip.outro.sel{background:var(--outro-sel);color:#fff}
-.sort-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
-.sort-label{font-size:12px;color:var(--text3);display:flex;align-items:center;gap:4px}
-.task-card{display:flex;gap:10px;align-items:flex-start;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:.875rem 1rem;margin-bottom:6px}
-.task-card:hover{border-color:var(--border2);box-shadow:var(--shadow)}
-.task-card.done{opacity:.5}.task-card.done .task-title{text-decoration:line-through}
-.prio-bar{width:3px;border-radius:2px;align-self:stretch;flex-shrink:0;min-height:20px}
-.cb{width:19px;height:19px;border:0.5px solid var(--border2);border-radius:5px;cursor:pointer;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;background:var(--bg)}
-.cb.checked{background:var(--text);border-color:var(--text)}
-.task-body{flex:1;min-width:0}
-.task-title{font-size:14px;color:var(--text);margin-bottom:4px;word-break:break-word;line-height:1.4}
-.task-meta{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
-.task-date{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:3px}
-.task-date.overdue{color:var(--red);font-weight:500}.task-date.today{color:var(--amber);font-weight:500}.task-date.soon{color:var(--societario-sel)}
-.task-note{font-size:12px;color:var(--text3);margin-top:5px;line-height:1.4;font-style:italic}
-.task-actions{display:flex;gap:2px;flex-shrink:0}
-.icon-btn{width:28px;height:28px;border:none;background:transparent;cursor:pointer;color:var(--text3);display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:15px}
-.icon-btn:hover{background:var(--bg2);color:var(--text)}
-.empty{text-align:center;padding:3rem 1rem;color:var(--text3)}
-.empty i{font-size:32px;display:block;margin-bottom:8px}
-.section-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin:1rem 0 .5rem;display:flex;align-items:center;gap:5px}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .2s}
-@media(min-width:600px){.modal-overlay{align-items:center;padding:1rem}}
-.modal-overlay.open{opacity:1;pointer-events:all}
-.modal{background:var(--bg);width:100%;max-width:520px;border-radius:var(--radius-lg) var(--radius-lg) 0 0;padding:1.25rem;border:0.5px solid var(--border2);transform:translateY(20px);transition:transform .2s;max-height:90dvh;overflow-y:auto}
-@media(min-width:600px){.modal{border-radius:var(--radius-lg);transform:scale(.97)}}
-.modal-overlay.open .modal{transform:translateY(0)}
-@media(min-width:600px){.modal-overlay.open .modal{transform:scale(1)}}
-.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
-.modal-title-text{font-size:15px;font-weight:600}
-.mfr{display:grid;gap:8px;grid-template-columns:1fr 1fr 1fr;margin-bottom:8px}
-@media(max-width:420px){.mfr{grid-template-columns:1fr 1fr}}
-.modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:1rem}
-.btn-cancel{padding:8px 16px;background:transparent;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:14px;color:var(--text2);cursor:pointer}
-.btn-cancel:hover{background:var(--bg2)}
-.btn-add{padding:8px 16px;background:var(--text);color:var(--bg);border:none;border-radius:var(--radius);font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px}
-.btn-add:active{opacity:.8}
-.btn-add .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:none}
-.btn-add.loading .spinner{display:block}.btn-add.loading .btn-label{display:none}
-.fab{display:none;position:fixed;bottom:1.5rem;right:1.5rem;z-index:40;width:52px;height:52px;border-radius:50%;background:var(--text);color:var(--bg);border:none;font-size:24px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);align-items:center;justify-content:center}
-.fab:active{transform:scale(.95)}
-@media(max-width:600px){.fab{display:flex}}
-input[type=text],input[type=date],select,textarea{width:100%;padding:8px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:14px;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-appearance:none;appearance:none}
-input[type=text]:focus,input[type=date]:focus,select:focus,textarea:focus{outline:none;border-color:var(--text2)}
-textarea{resize:vertical;min-height:60px;margin-top:8px}
-.sync-bar{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);padding:4px 0 10px;justify-content:flex-end}
-.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s}
-.sync-dot.ok{background:var(--green)}.sync-dot.err{background:var(--red)}.sync-dot.syncing{background:var(--amber);animation:pulse 1s infinite}
-.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:10px 18px;border-radius:var(--radius);font-size:13px;z-index:200;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
-
-/* ── Login screen ─────────────────────────────────────────── */
-.login-screen{position:fixed;inset:0;background:var(--bg3);display:flex;align-items:center;justify-content:center;z-index:300;padding:1.5rem}
-.login-box{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-lg);padding:2.5rem 2rem;max-width:360px;width:100%;text-align:center;box-shadow:var(--shadow)}
-.login-icon{font-size:40px;margin-bottom:1rem}
-.login-title{font-size:20px;font-weight:600;margin-bottom:.375rem}
-.login-sub{font-size:13px;color:var(--text2);margin-bottom:2rem;line-height:1.5}
-.btn-google{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:11px 16px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:14px;font-weight:500;color:var(--text);cursor:pointer;transition:background .15s}
-.btn-google:hover{background:var(--bg2)}
-.btn-google:active{transform:scale(.98)}
-.btn-google svg{flex-shrink:0}
-.login-screen.hidden{display:none}
-
-/* ── User avatar in header ───────────────────────────────── */
-.user-area{display:flex;align-items:center;gap:8px}
-.user-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;border:0.5px solid var(--border2)}
-.user-name{font-size:12px;color:var(--text2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(max-width:400px){.user-name{display:none}}
-.btn-logout{padding:5px 10px;background:transparent;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;color:var(--text3);cursor:pointer}
-.btn-logout:hover{background:var(--bg2);color:var(--text)}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Birdy · Tarefas</title>
+  <link rel="icon" type="image/svg+xml" href="brand/birdy-icon-64.svg">
+  <link rel="stylesheet" href="brand/birdy-tokens.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+  <script>(function(){var t=localStorage.getItem('birdy-theme');if(t&&t!=='auto')document.documentElement.setAttribute('data-theme',t)})();</script>
 </head>
 <body>
 
 <!-- Tela de login -->
 <div class="login-screen" id="login-screen">
   <div class="login-box">
-    <div class="login-icon">✅</div>
-    <div class="login-title">Minhas Tarefas</div>
+    <div class="login-logo">
+      <svg class="login-logo-light" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120">
+        <rect width="360" height="120" rx="14" fill="#F1EFE8"/>
+        <defs><g id="bl-bird">
+          <rect width="40" height="40" rx="9" fill="#F1EFE8"/>
+          <rect x="8.5" y="17.5" width="18.75" height="12.5" rx="3.75" fill="#1A1A1A" transform="rotate(-8,18,24)"/>
+          <circle cx="23.75" cy="12.5" r="5.625" fill="#1A1A1A"/>
+          <polygon points="8.5,21.25 3.75,27.5 11.25,27.5" fill="#1A1A1A"/>
+          <polygon points="11.25,18.75 23.75,16.25 22.5,21.25 11.25,22.5" fill="#1A1A1A" opacity="0.45"/>
+          <polygon points="28.75,11.875 34.375,13.125 28.75,15" fill="#1A1A1A"/>
+          <circle cx="25" cy="11.875" r="1.75" fill="#F1EFE8"/>
+          <circle cx="25.625" cy="11.25" r="0.5625" fill="#1A1A1A"/>
+        </g></defs>
+        <g transform="translate(36,18)"><use href="#bl-bird"/></g>
+        <text x="88" y="52" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="36" font-weight="600" fill="#1A1A1A" letter-spacing="-1" dominant-baseline="baseline">Birdy</text>
+        <line x1="36" y1="70" x2="324" y2="70" stroke="#D3D1C7" stroke-width="0.5"/>
+        <text x="180" y="97" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="12" fill="#888780" letter-spacing="1.2">Anote. Organize. Voe mais leve.</text>
+      </svg>
+      <svg class="login-logo-dark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120">
+        <rect width="360" height="120" rx="14" fill="#1A1A1A"/>
+        <defs><g id="bd-bird">
+          <rect width="40" height="40" rx="9" fill="#1A1A1A"/>
+          <rect x="8.5" y="17.5" width="18.75" height="12.5" rx="3.75" fill="white" transform="rotate(-8,18,24)"/>
+          <circle cx="23.75" cy="12.5" r="5.625" fill="white"/>
+          <polygon points="8.5,21.25 3.75,27.5 11.25,27.5" fill="white"/>
+          <polygon points="11.25,18.75 23.75,16.25 22.5,21.25 11.25,22.5" fill="white" opacity="0.55"/>
+          <polygon points="28.75,11.875 34.375,13.125 28.75,15" fill="white"/>
+          <circle cx="25" cy="11.875" r="1.75" fill="#1A1A1A"/>
+          <circle cx="25.625" cy="11.25" r="0.5625" fill="white"/>
+        </g></defs>
+        <g transform="translate(36,18)"><use href="#bd-bird"/></g>
+        <text x="88" y="52" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="36" font-weight="600" fill="white" letter-spacing="-1" dominant-baseline="baseline">Birdy</text>
+        <line x1="36" y1="70" x2="324" y2="70" stroke="#333333" stroke-width="0.5"/>
+        <text x="180" y="97" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="12" fill="#888780" letter-spacing="1.2">Anote. Organize. Voe mais leve.</text>
+      </svg>
+    </div>
     <div class="login-sub">Entre com sua conta Google para acessar suas tarefas de qualquer dispositivo.</div>
     <button class="btn-google" id="btn-google-login">
-      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/></svg>
+      <svg width="18" height="18" viewBox="0 0 18 18">
+        <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+        <path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/>
+        <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/>
+      </svg>
       Entrar com Google
     </button>
   </div>
@@ -136,12 +71,30 @@ textarea{resize:vertical;min-height:60px;margin-top:8px}
   <div class="header">
     <div class="header-top">
       <div>
-        <div class="header-title"><i class="ti ti-checkbox" aria-hidden="true"></i>Minhas Tarefas</div>
+        <div class="header-title">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 52" height="26" aria-label="Birdy" style="flex-shrink:0;overflow:visible">
+            <defs><g id="wm-bird">
+              <rect width="40" height="40" rx="9" fill="#1A1A1A"/>
+              <rect x="8.5" y="17.5" width="18.75" height="12.5" rx="3.75" fill="white" transform="rotate(-8,18,24)"/>
+              <circle cx="23.75" cy="12.5" r="5.625" fill="white"/>
+              <polygon points="8.5,21.25 3.75,27.5 11.25,27.5" fill="white"/>
+              <polygon points="11.25,18.75 23.75,16.25 22.5,21.25 11.25,22.5" fill="white" opacity="0.55"/>
+              <polygon points="28.75,11.875 34.375,13.125 28.75,15" fill="white"/>
+              <circle cx="25" cy="11.875" r="1.75" fill="#1A1A1A"/>
+              <circle cx="25.625" cy="11.25" r="0.5625" fill="white"/>
+            </g></defs>
+            <g transform="translate(0,6)"><use href="#wm-bird"/></g>
+            <text x="52" y="40" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="36" font-weight="600" fill="currentColor" letter-spacing="-1" dominant-baseline="baseline">Birdy</text>
+          </svg>
+        </div>
         <div class="header-date" id="date-label"></div>
       </div>
       <div class="user-area">
         <img class="user-avatar" id="user-avatar" src="" alt="">
         <span class="user-name" id="user-name"></span>
+        <button class="btn-theme" id="btn-theme" onclick="cycleTheme()" title="Alternar tema" aria-label="Alternar tema">
+          <i class="ti ti-brightness-auto" id="theme-icon"></i>
+        </button>
         <button class="btn-logout" onclick="doLogout()">Sair</button>
         <button class="btn-new" onclick="openModal()"><i class="ti ti-plus" aria-hidden="true"></i>Nova tarefa</button>
       </div>
@@ -158,6 +111,11 @@ textarea{resize:vertical;min-height:60px;margin-top:8px}
       <div class="sync-dot syncing" id="sync-dot"></div>
       <span id="sync-label">Conectando…</span>
     </div>
+    <div class="search-wrap">
+      <i class="ti ti-search search-icon" aria-hidden="true"></i>
+      <input type="text" class="search-input" id="search-input" placeholder="Buscar tarefas…" oninput="setSearch(this.value)" autocomplete="off">
+      <button class="search-clear" id="search-clear" onclick="clearSearch()" aria-label="Limpar busca" style="display:none"><i class="ti ti-x"></i></button>
+    </div>
     <div class="filters" id="filters"></div>
     <div class="sort-row">
       <span class="sort-label"><i class="ti ti-arrows-sort" aria-hidden="true" style="font-size:13px"></i>Ordenar por</span>
@@ -172,7 +130,9 @@ textarea{resize:vertical;min-height:60px;margin-top:8px}
   </div>
 </div>
 
-<button class="fab" onclick="openModal()" aria-label="Nova tarefa" id="fab"><i class="ti ti-plus" aria-hidden="true"></i></button>
+<button class="fab" onclick="openModal()" aria-label="Nova tarefa" id="fab">
+  <i class="ti ti-plus" aria-hidden="true"></i>
+</button>
 
 <div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)" role="dialog" aria-modal="true">
   <div class="modal">
@@ -209,198 +169,36 @@ textarea{resize:vertical;min-height:60px;margin-top:8px}
   </div>
 </div>
 
+<!-- Modal de detalhes da tarefa -->
+<div class="modal-overlay" id="detail-overlay" onclick="handleDetailOverlayClick(event)" role="dialog" aria-modal="true">
+  <div class="modal detail-modal">
+    <div class="modal-header">
+      <span class="modal-title-text" id="detail-title"></span>
+      <div style="display:flex;gap:4px">
+        <button class="icon-btn" id="detail-edit-btn" aria-label="Editar tarefa"><i class="ti ti-edit"></i></button>
+        <button class="icon-btn" onclick="closeDetail()" aria-label="Fechar"><i class="ti ti-x"></i></button>
+      </div>
+    </div>
+    <div class="detail-meta" id="detail-meta"></div>
+    <div class="detail-note-text" id="detail-note-text"></div>
+    <div class="detail-notes-header">
+      <span class="section-label" style="margin:0">Post-its</span>
+      <button class="btn-add-note" onclick="toggleNoteForm()"><i class="ti ti-plus"></i> Novo</button>
+    </div>
+    <div class="note-form" id="note-form" style="display:none">
+      <textarea id="note-text-input" placeholder="Comentário curto…" maxlength="150"></textarea>
+      <div class="note-colors" id="note-colors"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+        <button class="btn-cancel" onclick="toggleNoteForm()">Cancelar</button>
+        <button class="btn-add" onclick="saveNote()"><span class="btn-label">Adicionar</span></button>
+      </div>
+    </div>
+    <div class="postit-board" id="postit-board"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
-<script type="module">
-import { initializeApp }                                          from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
-                                                                  from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp }
-                                                                  from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
-
-// ── Config ────────────────────────────────────────────────────
-const firebaseConfig = {
-  apiKey:            "AIzaSyB5dmG3a12WDdE13jzKTfv9C65igNmhveU",
-  authDomain:        "birdy---to-do-s.firebaseapp.com",
-  projectId:         "birdy---to-do-s",
-  storageBucket:     "birdy---to-do-s.firebasestorage.app",
-  messagingSenderId: "564307060103",
-  appId:             "1:564307060103:web:45f9c3a0b5ba4d14131f22"
-};
-
-const fbApp   = initializeApp(firebaseConfig);
-const auth    = getAuth(fbApp);
-const db      = getFirestore(fbApp);
-const provider = new GoogleAuthProvider();
-
-// ── State ─────────────────────────────────────────────────────
-const CATS={prazo:{label:'Prazo judicial',icon:'⚖️',cls:'prazo'},contrato:{label:'Contrato',icon:'📄',cls:'contrato'},cartorio:{label:'Cartório',icon:'🏛️',cls:'cartorio'},societario:{label:'Societário',icon:'🏢',cls:'societario'},email:{label:'E-mail',icon:'✉️',cls:'email'},reuniao:{label:'Reunião',icon:'🤝',cls:'reuniao'},outro:{label:'Outro',icon:'📌',cls:'outro'}};
-const PRIO={alta:{color:'#E24B4A'},media:{color:'#BA7517'},baixa:{color:'#B4B2A9'}};
-let tasks=[],view='pending',filterCat='all',sortBy='prio',editId=null;
-let unsubTasks=null;
-
-// ── Auth ──────────────────────────────────────────────────────
-onAuthStateChanged(auth, user => {
-  if (user) {
-    // Logado
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('main-app').style.display = '';
-    document.getElementById('fab').style.display = '';
-    document.getElementById('user-name').textContent   = user.displayName || user.email;
-    document.getElementById('user-avatar').src         = user.photoURL || '';
-    document.getElementById('user-avatar').style.display = user.photoURL ? '' : 'none';
-    startListening(user.uid);
-  } else {
-    // Deslogado
-    document.getElementById('login-screen').classList.remove('hidden');
-    document.getElementById('main-app').style.display = 'none';
-    document.getElementById('fab').style.display = 'none';
-    if (unsubTasks) { unsubTasks(); unsubTasks = null; }
-    tasks = [];
-  }
-});
-
-document.getElementById('btn-google-login').addEventListener('click', async () => {
-  try {
-    await signInWithPopup(auth, provider);
-  } catch(e) {
-    console.error(e);
-    showToast('Erro ao fazer login. Tente novamente.');
-  }
-});
-
-window.doLogout = async function() {
-  await signOut(auth);
-};
-
-// ── Firestore — listener por usuário ─────────────────────────
-function startListening(uid) {
-  if (unsubTasks) unsubTasks();
-  const COL = collection(db, 'users', uid, 'tasks');
-  unsubTasks = onSnapshot(COL,
-    snap => {
-      tasks = snap.docs.map(d => ({...d.data(), _id: d.id, _col: COL}));
-      setSyncStatus('ok', 'Sincronizado');
-      render();
-    },
-    err => {
-      console.error(err);
-      setSyncStatus('err', 'Erro de conexão');
-    }
-  );
-}
-
-function getUserCol() {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return null;
-  return collection(db, 'users', uid, 'tasks');
-}
-
-// ── Helpers ───────────────────────────────────────────────────
-function today(){return new Date().toISOString().slice(0,10)}
-function fmtDate(d){if(!d)return null;const[y,m,dd]=d.split('-');return`${dd}/${m}/${y}`}
-function dateStatus(d){if(!d)return null;const t=today();if(d<t)return'overdue';if(d===t)return'today';if((new Date(d)-new Date(t))/86400000<=3)return'soon';return'normal'}
-function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function setSyncStatus(state,label){document.getElementById('sync-dot').className='sync-dot '+state;document.getElementById('sync-label').textContent=label}
-function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
-
-// ── Modal ─────────────────────────────────────────────────────
-window.openModal=function(id){
-  editId=id||null;const t=id?tasks.find(x=>x._id===id):null;
-  document.getElementById('modal-title-el').textContent=id?'Editar tarefa':'Nova tarefa';
-  document.getElementById('modal-save-btn').querySelector('.btn-label').textContent=id?'Salvar':'Adicionar';
-  document.getElementById('m-title').value=t?t.title:'';
-  document.getElementById('m-cat').value=t?t.cat:'prazo';
-  document.getElementById('m-prio').value=t?t.prio:'alta';
-  document.getElementById('m-date').value=t?(t.date||''):'';
-  document.getElementById('m-note').value=t?(t.note||''):'';
-  document.getElementById('modal-overlay').classList.add('open');
-  setTimeout(()=>document.getElementById('m-title').focus(),100);
-};
-window.closeModal=function(){document.getElementById('modal-overlay').classList.remove('open');editId=null};
-window.handleOverlayClick=function(e){if(e.target.id==='modal-overlay')closeModal()};
-
-window.saveModal=async function(){
-  const title=document.getElementById('m-title').value.trim();
-  if(!title){document.getElementById('m-title').focus();return}
-  const COL=getUserCol(); if(!COL)return;
-  const btn=document.getElementById('modal-save-btn');
-  btn.classList.add('loading');
-  const data={title,cat:document.getElementById('m-cat').value,prio:document.getElementById('m-prio').value,date:document.getElementById('m-date').value,note:document.getElementById('m-note').value.trim()};
-  try{
-    if(editId){
-      await updateDoc(doc(db,'users',auth.currentUser.uid,'tasks',editId),data);
-      showToast('Tarefa atualizada');
-    }else{
-      data.done=false;data.doneAt=null;data.added=serverTimestamp();
-      await addDoc(COL,data);
-      showToast('Tarefa adicionada');
-    }
-    closeModal();
-  }catch(e){console.error(e);showToast('Erro ao salvar. Tente novamente.')}
-  finally{btn.classList.remove('loading')}
-};
-
-window.toggleDone=async function(id){
-  const t=tasks.find(x=>x._id===id);if(!t)return;
-  const done=!t.done;
-  try{await updateDoc(doc(db,'users',auth.currentUser.uid,'tasks',id),{done,doneAt:done?Date.now():null})}
-  catch(e){showToast('Erro ao atualizar.')}
-};
-
-window.deleteTask=async function(id){
-  if(!confirm('Excluir esta tarefa?'))return;
-  try{
-    await deleteDoc(doc(db,'users',auth.currentUser.uid,'tasks',id));
-    showToast('Tarefa excluída');
-  }catch(e){showToast('Erro ao excluir.')}
-};
-
-window.setView=function(v){view=v;['pending','today','done'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('active',x===v));render()};
-
-// ── Render ────────────────────────────────────────────────────
-function getVisible(){
-  let list=tasks.filter(t=>{if(view==='pending')return!t.done;if(view==='done')return t.done;const s=dateStatus(t.date);return!t.done&&(s==='overdue'||s==='today'||s==='soon'||t.prio==='alta')});
-  if(filterCat!=='all')list=list.filter(t=>t.cat===filterCat);
-  return[...list].sort((a,b)=>{
-    if(sortBy==='prio'){const p={alta:0,media:1,baixa:2};return(p[a.prio]||0)-(p[b.prio]||0)||(a.date||'z').localeCompare(b.date||'z')}
-    if(sortBy==='date')return(a.date||'z').localeCompare(b.date||'z');
-    if(sortBy==='cat')return a.cat.localeCompare(b.cat);
-    return(b.added?.seconds||0)-(a.added?.seconds||0);
-  });
-}
-function renderStats(){
-  const pend=tasks.filter(x=>!x.done);
-  const urg=pend.filter(x=>{const s=dateStatus(x.date);return x.prio==='alta'||s==='overdue'||s==='today'||s==='soon'});
-  const tod=pend.filter(x=>{const s=dateStatus(x.date);return s==='overdue'||s==='today'});
-  const done7=tasks.filter(x=>x.done&&x.doneAt&&Date.now()-x.doneAt<7*86400000);
-  document.getElementById('stats').innerHTML=`<div class="stat"><div class="stat-n">${pend.length}</div><div class="stat-l">Pendentes</div></div><div class="stat"><div class="stat-n red">${urg.length}</div><div class="stat-l">Urgentes</div></div><div class="stat"><div class="stat-n amber">${tod.length}</div><div class="stat-l">Para hoje</div></div><div class="stat"><div class="stat-n green">${done7.length}</div><div class="stat-l">Concluídas 7d</div></div>`;
-}
-function renderFilters(){
-  const used=Object.keys(CATS).filter(c=>tasks.some(t=>t.cat===c));
-  document.getElementById('filters').innerHTML=`<span class="chip all${filterCat==='all'?' sel':''}" onclick="filterCat='all';render()">Todas</span>`+used.map(c=>`<span class="chip ${CATS[c].cls}${filterCat===c?' sel':''}" onclick="filterCat='${c}';render()">${CATS[c].icon} ${CATS[c].label}</span>`).join('');
-}
-function taskHtml(t){
-  const s=dateStatus(t.date);const pc=PRIO[t.prio]||PRIO.media;
-  const dc=s==='overdue'?'overdue':s==='today'?'today':s==='soon'?'soon':'';
-  const di=s==='overdue'?'ti-alert-triangle':s==='today'?'ti-calendar-event':'ti-calendar';
-  const dt=t.date?`<span class="task-date ${dc}"><i class="ti ${di}" style="font-size:12px"></i> ${s==='overdue'?'Venceu '+fmtDate(t.date):s==='today'?'Hoje':fmtDate(t.date)}</span>`:'';
-  return`<div class="task-card${t.done?' done':''}"><div class="prio-bar" style="background:${t.done?'var(--border)':pc.color}"></div><div class="cb${t.done?' checked':''}" onclick="toggleDone('${t._id}')" role="checkbox" aria-checked="${t.done}" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter')toggleDone('${t._id}')">${t.done?'<i class="ti ti-check" style="font-size:11px;color:var(--bg)"></i>':''}</div><div class="task-body"><div class="task-title">${esc(t.title)}</div><div class="task-meta"><span class="chip ${CATS[t.cat]?.cls||'outro'}" style="font-size:11px;padding:2px 7px">${CATS[t.cat]?.icon||''} ${CATS[t.cat]?.label||t.cat}</span>${dt}</div>${t.note?`<div class="task-note">${esc(t.note)}</div>`:''}</div><div class="task-actions"><button class="icon-btn" onclick="openModal('${t._id}')" aria-label="Editar"><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="deleteTask('${t._id}')" aria-label="Excluir"><i class="ti ti-trash"></i></button></div></div>`;
-}
-function renderList(){
-  const el=document.getElementById('list');const list=getVisible();
-  if(!list.length){el.innerHTML=`<div class="empty"><i class="ti ti-mood-smile"></i>${view==='done'?'Nenhuma tarefa concluída ainda.':view==='today'?'Nenhuma tarefa urgente ou para hoje!':'Nenhuma tarefa pendente. Bom trabalho!'}</div>`;return}
-  let html='';
-  if(view==='pending'){const over=list.filter(t=>dateStatus(t.date)==='overdue');const rest=list.filter(t=>dateStatus(t.date)!=='overdue');if(over.length){html+=`<div class="section-label"><i class="ti ti-alert-circle" style="font-size:13px"></i>Vencidas</div>`;over.forEach(t=>{html+=taskHtml(t)});if(rest.length)html+=`<div class="section-label" style="margin-top:1.25rem">Demais tarefas</div>`}rest.forEach(t=>{html+=taskHtml(t)})}
-  else{list.forEach(t=>{html+=taskHtml(t)})}
-  el.innerHTML=html;
-}
-window.render=function(){renderStats();renderFilters();renderList()};
-
-// ── Data label ────────────────────────────────────────────────
-(function(){const d=new Date();const dias=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];const meses=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];document.getElementById('date-label').textContent=`${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`})();
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
-render();
-</script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

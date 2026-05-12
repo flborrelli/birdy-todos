@@ -1,0 +1,26 @@
+{
+  "hosting": [
+    {
+      "target": "app",
+      "public": ".",
+      "ignore": [
+        "firebase.json",
+        ".firebaserc",
+        "**/.*"
+      ],
+      "cleanUrls": true
+    },
+    {
+      "target": "legacy",
+      "public": ".",
+      "ignore": ["**"],
+      "redirects": [
+        {
+          "source": "**",
+          "destination": "https://birdy-tarefas.web.app",
+          "type": 301
+        }
+      ]
+    }
+  ]
+}

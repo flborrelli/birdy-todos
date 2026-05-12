@@ -1,0 +1,13 @@
+{
+  "projects": {
+    "default": "birdy---to-do-s"
+  },
+  "targets": {
+    "birdy---to-do-s": {
+      "hosting": {
+        "app": ["birdy-tarefas"],
+        "legacy": ["birdy---to-do-s"]
+      }
+    }
+  }
+}

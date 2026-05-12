@@ -1,0 +1,29 @@
+/* ─────────────────────────────────────────
+   Birdy — Brand Tokens
+   ───────────────────────────────────────── */
+
+:root {
+  /* Cores principais */
+  --birdy-bg-dark:      #1A1A1A;
+  --birdy-bg-light:     #F1EFE8;
+  --birdy-text-dark:    #1A1A1A;
+  --birdy-text-light:   #FFFFFF;
+  --birdy-text-muted:   #888780;
+  --birdy-border-dark:  #333333;
+  --birdy-border-light: #D3D1C7;
+
+  /* Tipografia */
+  --birdy-font:         -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --birdy-wordmark-size:    36px;
+  --birdy-wordmark-weight:  600;
+  --birdy-wordmark-tracking: -1px;
+  --birdy-tagline-size:     12px;
+  --birdy-tagline-tracking: 1.2px;
+
+  /* Tagline */
+  --birdy-tagline: "Anote. Organize. Voe mais leve.";
+
+  /* Ícone */
+  --birdy-icon-radius: 9px;   /* para 40px */
+  --birdy-icon-radius-lg: 14px; /* para 64px */
+}
