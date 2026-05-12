@@ -191,13 +191,13 @@ textarea { resize: vertical; min-height: 60px; margin-top: 8px; }
 .login-box { background: var(--bg); border: 0.5px solid var(--border2); border-radius: var(--radius-lg); padding: 2.5rem 2rem; max-width: 360px; width: 100%; text-align: center; box-shadow: var(--shadow); }
 .login-logo { margin-bottom: 1.5rem; }
 .login-logo svg { width: 100%; height: auto; display: block; border-radius: var(--radius-lg); }
-.login-logo-dark { display: none; }
+.login-logo svg.login-logo-dark { display: none; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .login-logo-dark { display: block; }
-  :root:not([data-theme="light"]) .login-logo-light { display: none; }
+  :root:not([data-theme="light"]) .login-logo svg.login-logo-dark { display: block; }
+  :root:not([data-theme="light"]) .login-logo svg.login-logo-light { display: none; }
 }
-:root[data-theme="dark"] .login-logo-dark { display: block; }
-:root[data-theme="dark"] .login-logo-light { display: none; }
+:root[data-theme="dark"] .login-logo svg.login-logo-dark { display: block; }
+:root[data-theme="dark"] .login-logo svg.login-logo-light { display: none; }
 .login-sub { font-size: 13px; color: var(--text2); margin-bottom: 2rem; line-height: 1.5; }
 .btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 11px 16px; background: var(--bg); border: 0.5px solid var(--border2); border-radius: var(--radius); font-size: 14px; font-weight: 500; color: var(--text); cursor: pointer; transition: background .15s; }
 .btn-google:hover { background: var(--bg2); }
