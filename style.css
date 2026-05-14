@@ -70,7 +70,7 @@ body { font-family: var(--font); background: var(--bg3); color: var(--text); min
 /* ── Layout ──────────────────────────────────────────────────── */
 .app { display: flex; flex-direction: column; }
 @media (min-width: 860px) {
-  .app { display: grid; grid-template-columns: 260px 1fr; min-height: 100dvh; max-width: 1200px; margin: 0 auto; }
+  .app { display: grid; grid-template-columns: 260px 1fr; min-height: 100dvh; }
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────── */
