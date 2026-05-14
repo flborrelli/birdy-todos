@@ -1,7 +1,7 @@
 import { initializeApp }       from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
                                from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp }
+import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, increment }
                                from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
 
 // ── Config ────────────────────────────────────────────────────
@@ -255,6 +255,10 @@ function taskHtml(t) {
   const dt = t.date
     ? `<span class="task-date ${dc}"><i class="ti ${di}" style="font-size:12px"></i> ${s === 'overdue' ? 'Venceu ' + fmtDate(t.date) : s === 'today' ? 'Hoje' : fmtDate(t.date)}</span>`
     : '';
+  const nc = t.noteCount || 0;
+  const postits = nc > 0
+    ? `<div class="card-postits"><i class="ti ti-note card-postit-icon"></i><span class="card-postit-text">${esc(t.notePreview || '')}</span>${nc > 1 ? `<span class="card-postit-count">+${nc - 1}</span>` : ''}</div>`
+    : '';
   return `<div class="task-card${t.done ? ' done' : ''}">` +
     `<div class="prio-bar" style="background:${t.done ? 'var(--border)' : pc.color}"></div>` +
     `<div class="cb${t.done ? ' checked' : ''}" onclick="toggleDone('${t._id}')" role="checkbox" aria-checked="${t.done}" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter')toggleDone('${t._id}')">${t.done ? '<i class="ti ti-check" style="font-size:11px;color:var(--bg)"></i>' : ''}</div>` +
@@ -262,6 +266,7 @@ function taskHtml(t) {
       `<div class="task-title">${esc(t.title)}</div>` +
       `<div class="task-meta"><span class="chip ${CATS[t.cat]?.cls || 'outro'}" style="font-size:11px;padding:2px 7px">${CATS[t.cat]?.icon || ''} ${CATS[t.cat]?.label || t.cat}</span>${dt}</div>` +
       (t.note ? `<div class="task-note">${esc(t.note)}</div>` : '') +
+      postits +
     `</div>` +
     `<div class="task-actions">` +
       `<button class="icon-btn" onclick="openModal('${t._id}')" aria-label="Editar"><i class="ti ti-edit"></i></button>` +
@@ -420,14 +425,13 @@ window.saveNote = async function () {
   if (!text || !detailTaskId) return;
   const uid = auth.currentUser?.uid;
   if (!uid) return;
-  const col = collection(db, 'users', uid, 'tasks', detailTaskId, 'notes');
+  const col     = collection(db, 'users', uid, 'tasks', detailTaskId, 'notes');
+  const taskRef = doc(db, 'users', uid, 'tasks', detailTaskId);
   try {
-    await addDoc(col, {
-      text,
-      color:     selectedNoteColor,
-      rotation:  parseFloat((Math.random() * 6 - 3).toFixed(1)),
-      createdAt: serverTimestamp(),
-    });
+    await Promise.all([
+      addDoc(col, { text, color: selectedNoteColor, rotation: parseFloat((Math.random() * 6 - 3).toFixed(1)), createdAt: serverTimestamp() }),
+      updateDoc(taskRef, { noteCount: increment(1), notePreview: text }),
+    ]);
     document.getElementById('note-text-input').value = '';
     document.getElementById('note-form').style.display = 'none';
   } catch (e) {
@@ -439,8 +443,14 @@ window.saveNote = async function () {
 window.deleteNote = async function (taskId, noteId) {
   const uid = auth.currentUser?.uid;
   if (!uid) return;
+  const task    = tasks.find(x => x._id === taskId);
+  const isLast  = (task?.noteCount || 1) <= 1;
+  const taskRef = doc(db, 'users', uid, 'tasks', taskId);
   try {
-    await deleteDoc(doc(db, 'users', uid, 'tasks', taskId, 'notes', noteId));
+    await Promise.all([
+      deleteDoc(doc(db, 'users', uid, 'tasks', taskId, 'notes', noteId)),
+      updateDoc(taskRef, { noteCount: increment(-1), ...(isLast ? { notePreview: '' } : {}) }),
+    ]);
   } catch (e) {
     showToast('Erro ao excluir post-it.');
   }

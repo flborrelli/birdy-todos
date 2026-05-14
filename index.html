@@ -68,9 +68,9 @@
 
 <!-- App principal -->
 <div class="app" id="main-app" style="display:none">
-  <div class="header">
-    <div class="header-top">
-      <div>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
         <div class="header-title">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 52" height="26" aria-label="Birdy" style="flex-shrink:0;overflow:visible">
             <defs><g id="wm-bird">
@@ -96,16 +96,18 @@
           <i class="ti ti-brightness-auto" id="theme-icon"></i>
         </button>
         <button class="btn-logout" onclick="doLogout()">Sair</button>
-        <button class="btn-new" onclick="openModal()"><i class="ti ti-plus" aria-hidden="true"></i>Nova tarefa</button>
       </div>
     </div>
+    <button class="btn-new sidebar-new" onclick="openModal()"><i class="ti ti-plus" aria-hidden="true"></i>Nova tarefa</button>
+    <div class="sidebar-divider"></div>
     <div class="stats" id="stats"></div>
+    <div class="sidebar-divider"></div>
     <div class="tabs">
-      <button class="tab active" onclick="setView('pending')" id="tab-pending"><i class="ti ti-clock" aria-hidden="true"></i>Pendentes</button>
-      <button class="tab" onclick="setView('today')" id="tab-today"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Urgentes</button>
-      <button class="tab" onclick="setView('done')" id="tab-done"><i class="ti ti-check" aria-hidden="true"></i>Concluídas</button>
+      <button class="tab active" onclick="setView('pending')" id="tab-pending"><i class="ti ti-clock" aria-hidden="true"></i><span>Pendentes</span></button>
+      <button class="tab" onclick="setView('today')" id="tab-today"><i class="ti ti-alert-triangle" aria-hidden="true"></i><span>Urgentes</span></button>
+      <button class="tab" onclick="setView('done')" id="tab-done"><i class="ti ti-check" aria-hidden="true"></i><span>Concluídas</span></button>
     </div>
-  </div>
+  </aside>
   <div class="content">
     <div class="sync-bar">
       <div class="sync-dot syncing" id="sync-dot"></div>
