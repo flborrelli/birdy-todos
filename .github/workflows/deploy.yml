@@ -10,19 +10,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Autenticar no Google Cloud
+        uses: google-github-actions/auth@v2
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: birdy---to-do-s
-          target: app
-          channelId: live
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Deploy Firestore Rules
-        env:
-          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Deploy Hosting + Firestore Rules
         run: |
           npm install -g firebase-tools
-          echo "$SA_JSON" > /tmp/sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only firestore:rules --project birdy---to-do-s
-          rm /tmp/sa.json
+          firebase deploy --only hosting:app,firestore:rules --project birdy---to-do-s
