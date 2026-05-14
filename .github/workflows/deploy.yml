@@ -7,6 +7,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
 
@@ -19,8 +21,10 @@ jobs:
           channelId: live
 
       - name: Deploy Firestore Rules
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
           npm install -g firebase-tools
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=sa.json firebase deploy --only firestore:rules --project birdy---to-do-s
-          rm sa.json
+          echo "$SA_JSON" > /tmp/sa.json
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only firestore:rules --project birdy---to-do-s
+          rm /tmp/sa.json
