@@ -312,31 +312,24 @@ function renderList() {
     }</div>`;
     return;
   }
-  let html = '';
+  let html = '<div class="task-grid">';
   if (view === 'pending') {
     const over = list.filter(t => dateStatus(t.date) === 'overdue');
     const rest = list.filter(t => dateStatus(t.date) !== 'overdue');
     if (over.length) {
-      html += `<div class="task-grid">`;
       html += `<div class="section-label"><i class="ti ti-alert-circle" style="font-size:13px"></i>Vencidas</div>`;
       over.forEach(t => { html += taskHtml(t); });
-      html += `</div>`;
       if (rest.length) {
-        html += `<div class="task-grid">`;
-        html += `<div class="section-label" style="margin-top:1.25rem">Demais tarefas</div>`;
+        html += `<div class="section-label" style="margin-top:.5rem">Demais tarefas</div>`;
         rest.forEach(t => { html += taskHtml(t); });
-        html += `</div>`;
       }
     } else {
-      html += `<div class="task-grid">`;
-      rest.forEach(t => { html += taskHtml(t); });
-      html += `</div>`;
+      list.forEach(t => { html += taskHtml(t); });
     }
   } else {
-    html += `<div class="task-grid">`;
     list.forEach(t => { html += taskHtml(t); });
-    html += `</div>`;
   }
+  html += '</div>';
   el.innerHTML = html;
 }
 
