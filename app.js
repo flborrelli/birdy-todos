@@ -25,6 +25,8 @@ const CATS = {
   contrato:   { label: 'Contrato',       icon: '📄',  cls: 'contrato' },
   cartorio:   { label: 'Cartório',       icon: '🏛️', cls: 'cartorio' },
   societario: { label: 'Societário',     icon: '🏢',  cls: 'societario' },
+  ato:        { label: 'Ato Societário', icon: '📋',  cls: 'ato' },
+  procuracao: { label: 'Procuração',     icon: '✍️',  cls: 'procuracao' },
   email:      { label: 'E-mail',         icon: '✉️',  cls: 'email' },
   reuniao:    { label: 'Reunião',        icon: '🤝',  cls: 'reuniao' },
   outro:      { label: 'Outro',          icon: '📌',  cls: 'outro' },
