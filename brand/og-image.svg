@@ -1,0 +1,49 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fundo -->
+  <rect width="1200" height="630" fill="#1A1A1A"/>
+
+  <!-- Gradiente sutil no fundo -->
+  <defs>
+    <radialGradient id="glow" cx="35%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#2a2a28"/>
+      <stop offset="100%" stop-color="#1A1A1A"/>
+    </radialGradient>
+    <g id="og-bird">
+      <rect width="160" height="160" rx="36" fill="#1A1A1A"/>
+      <rect x="34" y="70" width="75" height="50" rx="15" fill="white" transform="rotate(-8, 72, 96)"/>
+      <circle cx="95" cy="50" r="22.5" fill="white"/>
+      <polygon points="34,85 15,110 45,110" fill="white"/>
+      <polygon points="45,75 95,65 90,85 45,90" fill="white" opacity="0.55"/>
+      <polygon points="115,47.5 137.5,52.5 115,60" fill="white"/>
+      <circle cx="100" cy="47.5" r="7" fill="#1A1A1A"/>
+      <circle cx="102.5" cy="45" r="2.25" fill="white"/>
+    </g>
+  </defs>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Linha decorativa superior -->
+  <line x1="80" y1="56" x2="1120" y2="56" stroke="#2e2e2b" stroke-width="1"/>
+
+  <!-- Ícone do pássaro grande -->
+  <g transform="translate(80, 195) scale(1.5)">
+    <use href="#og-bird"/>
+  </g>
+
+  <!-- Wordmark Birdy -->
+  <text x="340" y="295" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif" font-size="120" font-weight="700" fill="white" letter-spacing="-4">Birdy</text>
+
+  <!-- Separador -->
+  <line x1="340" y1="345" x2="1120" y2="345" stroke="#2e2e2b" stroke-width="1"/>
+
+  <!-- Tagline -->
+  <text x="340" y="400" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif" font-size="32" font-weight="400" fill="#888780" letter-spacing="3">Anote. Organize. Voe mais leve.</text>
+
+  <!-- Descrição -->
+  <text x="340" y="460" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif" font-size="26" font-weight="400" fill="#5a5a56">Gerenciador de tarefas jurídicas</text>
+
+  <!-- URL -->
+  <text x="340" y="548" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif" font-size="22" font-weight="400" fill="#3a3a38" letter-spacing="0.5">birdy-tarefas.web.app</text>
+
+  <!-- Linha decorativa inferior -->
+  <line x1="80" y1="574" x2="1120" y2="574" stroke="#2e2e2b" stroke-width="1"/>
+</svg>
