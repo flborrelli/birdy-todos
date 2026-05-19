@@ -106,6 +106,7 @@
       <button class="tab active" onclick="setView('pending')" id="tab-pending"><i class="ti ti-clock" aria-hidden="true"></i><span>Pendentes</span></button>
       <button class="tab" onclick="setView('today')" id="tab-today"><i class="ti ti-alert-triangle" aria-hidden="true"></i><span>Urgentes</span></button>
       <button class="tab" onclick="setView('done')" id="tab-done"><i class="ti ti-check" aria-hidden="true"></i><span>Concluídas</span></button>
+      <button class="tab" onclick="setView('calendar')" id="tab-calendar"><i class="ti ti-calendar-month" aria-hidden="true"></i><span>Calendário</span></button>
     </div>
   </aside>
   <div class="content">
@@ -144,7 +145,7 @@
     </div>
     <input type="text" id="m-title" placeholder="Descrição da tarefa…" style="width:100%;margin-bottom:8px" onkeydown="if(event.key==='Enter')saveModal()">
     <div class="mfr">
-      <select id="m-cat">
+      <select id="m-cat" onchange="togglePrazoFields()">
         <option value="prazo">⚖️ Prazo judicial</option>
         <option value="contrato">📄 Contrato</option>
         <option value="cartorio">🏛️ Cartório</option>
@@ -162,7 +163,15 @@
       </select>
       <input type="date" id="m-date">
     </div>
-    <textarea id="m-note" placeholder="Nº do processo, nome do cliente, observações…"></textarea>
+    <div class="prazo-fields" id="prazo-fields" style="display:none">
+      <div class="prazo-fields-label"><i class="ti ti-scale" style="font-size:12px"></i>Dados do processo <span style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.65;margin-left:3px">(opcional)</span></div>
+      <input type="text" id="m-processo" placeholder="Nº do processo (ex: 1023456-78.2024.8.26.0100)">
+      <div class="prazo-row">
+        <input type="text" id="m-autor" placeholder="Autor">
+        <input type="text" id="m-reu" placeholder="Réu">
+      </div>
+    </div>
+    <textarea id="m-note" placeholder="Observações…"></textarea>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
       <button class="btn-add" onclick="saveModal()" id="modal-save-btn">
