@@ -37,6 +37,7 @@ const PRIO = {
   baixa: { color: '#B4B2A9' },
 };
 let tasks = [], view = 'pending', filterCat = 'all', sortBy = 'prio', editId = null;
+let calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
 let unsubTasks = null;
 let searchQuery = '';
 let detailTaskId = null, unsubNotes = null, selectedNoteColor = '#FEF08A';
@@ -133,16 +134,30 @@ function showToast(msg) {
 }
 
 // ── Modal ─────────────────────────────────────────────────────
+window.togglePrazoFields = function () {
+  const isPrazo = document.getElementById('m-cat').value === 'prazo';
+  document.getElementById('prazo-fields').style.display = isPrazo ? '' : 'none';
+  if (!isPrazo) {
+    document.getElementById('m-processo').value = '';
+    document.getElementById('m-autor').value = '';
+    document.getElementById('m-reu').value = '';
+  }
+};
+
 window.openModal = function (id) {
   editId = id || null;
   const t = id ? tasks.find(x => x._id === id) : null;
   document.getElementById('modal-title-el').textContent = id ? 'Editar tarefa' : 'Nova tarefa';
   document.getElementById('modal-save-btn').querySelector('.btn-label').textContent = id ? 'Salvar' : 'Adicionar';
-  document.getElementById('m-title').value = t ? t.title : '';
-  document.getElementById('m-cat').value   = t ? t.cat   : 'prazo';
-  document.getElementById('m-prio').value  = t ? t.prio  : 'alta';
-  document.getElementById('m-date').value  = t ? (t.date || '') : '';
-  document.getElementById('m-note').value  = t ? (t.note || '') : '';
+  document.getElementById('m-title').value    = t ? t.title : '';
+  document.getElementById('m-cat').value      = t ? t.cat   : 'prazo';
+  document.getElementById('m-prio').value     = t ? t.prio  : 'alta';
+  document.getElementById('m-date').value     = t ? (t.date || '') : '';
+  document.getElementById('m-note').value     = t ? (t.note || '') : '';
+  document.getElementById('m-processo').value = t ? (t.processo || '') : '';
+  document.getElementById('m-autor').value    = t ? (t.autor || '') : '';
+  document.getElementById('m-reu').value      = t ? (t.reu || '') : '';
+  togglePrazoFields();
   document.getElementById('modal-overlay').classList.add('open');
   setTimeout(() => document.getElementById('m-title').focus(), 100);
 };
@@ -162,12 +177,16 @@ window.saveModal = async function () {
   const COL = getUserCol(); if (!COL) return;
   const btn = document.getElementById('modal-save-btn');
   btn.classList.add('loading');
+  const cat = document.getElementById('m-cat').value;
   const data = {
     title,
-    cat:  document.getElementById('m-cat').value,
-    prio: document.getElementById('m-prio').value,
-    date: document.getElementById('m-date').value,
-    note: document.getElementById('m-note').value.trim(),
+    cat,
+    prio:     document.getElementById('m-prio').value,
+    date:     document.getElementById('m-date').value,
+    note:     document.getElementById('m-note').value.trim(),
+    processo: cat === 'prazo' ? document.getElementById('m-processo').value.trim() : '',
+    autor:    cat === 'prazo' ? document.getElementById('m-autor').value.trim() : '',
+    reu:      cat === 'prazo' ? document.getElementById('m-reu').value.trim() : '',
   };
   try {
     if (editId) {
@@ -205,7 +224,11 @@ window.deleteTask = async function (id) {
 
 window.setView = function (v) {
   view = v;
-  ['pending', 'today', 'done'].forEach(x => document.getElementById('tab-' + x).classList.toggle('active', x === v));
+  ['pending', 'today', 'done', 'calendar'].forEach(x => document.getElementById('tab-' + x).classList.toggle('active', x === v));
+  const isCal = v === 'calendar';
+  document.querySelector('.search-wrap').style.display = isCal ? 'none' : '';
+  document.getElementById('filters').style.display     = isCal ? 'none' : '';
+  document.querySelector('.sort-row').style.display    = isCal ? 'none' : '';
   render();
 };
 
@@ -220,7 +243,7 @@ function getVisible() {
   if (filterCat !== 'all') list = list.filter(t => t.cat === filterCat);
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
-    list = list.filter(t => t.title.toLowerCase().includes(q) || (t.note || '').toLowerCase().includes(q));
+    list = list.filter(t => t.title.toLowerCase().includes(q) || (t.note || '').toLowerCase().includes(q) || (t.processo || '').toLowerCase().includes(q) || (t.autor || '').toLowerCase().includes(q) || (t.reu || '').toLowerCase().includes(q));
   }
   return [...list].sort((a, b) => {
     if (sortBy === 'prio') { const p = { alta: 0, media: 1, baixa: 2 }; return (p[a.prio] || 0) - (p[b.prio] || 0) || (a.date || 'z').localeCompare(b.date || 'z'); }
@@ -266,7 +289,9 @@ function taskHtml(t) {
     `<div class="cb${t.done ? ' checked' : ''}" onclick="toggleDone('${t._id}')" role="checkbox" aria-checked="${t.done}" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter')toggleDone('${t._id}')">${t.done ? '<i class="ti ti-check" style="font-size:11px;color:var(--bg)"></i>' : ''}</div>` +
     `<div class="task-body" onclick="openDetail('${t._id}')" style="cursor:pointer">` +
       `<div class="task-title">${esc(t.title)}</div>` +
-      `<div class="task-meta"><span class="chip ${CATS[t.cat]?.cls || 'outro'}" style="font-size:11px;padding:2px 7px">${CATS[t.cat]?.icon || ''} ${CATS[t.cat]?.label || t.cat}</span>${dt}</div>` +
+      (t.cat === 'prazo' && t.processo ? `<div class="task-processo"><i class="ti ti-file-text" style="font-size:11px;flex-shrink:0"></i><strong>${esc(t.processo)}</strong></div>` : '') +
+      (t.cat === 'prazo' && (t.autor || t.reu) ? `<div class="task-partes">${esc(t.autor || '—')} <span style="color:var(--text3);font-weight:400">×</span> ${esc(t.reu || '—')}</div>` : '') +
+      `<div class="task-meta" style="margin-top:${t.cat === 'prazo' && (t.processo || t.autor) ? '5px' : '4px'}"><span class="chip ${CATS[t.cat]?.cls || 'outro'}" style="font-size:11px;padding:2px 7px">${CATS[t.cat]?.icon || ''} ${CATS[t.cat]?.label || t.cat}</span>${dt}</div>` +
       (t.note ? `<div class="task-note">${esc(t.note)}</div>` : '') +
       postits +
     `</div>` +
@@ -315,7 +340,79 @@ function renderList() {
   el.innerHTML = html;
 }
 
-window.render = function () { renderStats(); renderFilters(); renderList(); };
+window.render = function () {
+  renderStats();
+  if (view === 'calendar') { renderCalendar(); } else { renderFilters(); renderList(); }
+};
+
+// ── Calendário ────────────────────────────────────────────────
+const CAL_MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const CAL_DOW    = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+function renderCalendar() {
+  const el  = document.getElementById('list');
+  const pad = n => String(n).padStart(2, '0');
+  const todayStr    = today();
+  const firstDay    = new Date(calYear, calMonth, 1);
+  const lastDay     = new Date(calYear, calMonth + 1, 0);
+  const startDow    = firstDay.getDay();
+  const totalDays   = lastDay.getDate();
+  const monthPrefix = `${calYear}-${pad(calMonth + 1)}`;
+
+  const tasksByDay = {};
+  tasks.filter(t => !t.done && t.date && t.date.startsWith(monthPrefix)).forEach(t => {
+    const d = parseInt(t.date.split('-')[2]);
+    (tasksByDay[d] = tasksByDay[d] || []).push(t);
+  });
+
+  let html = `<div class="cal-wrap">`;
+  html += `<div class="cal-header"><div class="cal-title">${CAL_MONTHS[calMonth]} ${calYear}</div>`;
+  html += `<div style="display:flex;align-items:center;gap:8px">`;
+  html += `<div class="cal-nav"><button onclick="calPrev()"><i class="ti ti-chevron-left"></i></button><button onclick="calNext()"><i class="ti ti-chevron-right"></i></button></div>`;
+  html += `<button class="cal-today-btn" onclick="calToday()">Hoje</button></div></div>`;
+
+  html += `<div class="cal-grid">`;
+  CAL_DOW.forEach(d => { html += `<div class="cal-dow">${d}</div>`; });
+
+  const prevLast = new Date(calYear, calMonth, 0).getDate();
+  for (let i = startDow - 1; i >= 0; i--) {
+    html += `<div class="cal-day other-month"><div class="cal-day-num">${prevLast - i}</div></div>`;
+  }
+
+  for (let d = 1; d <= totalDays; d++) {
+    const dateStr  = `${calYear}-${pad(calMonth + 1)}-${pad(d)}`;
+    const isToday  = dateStr === todayStr;
+    const isPast   = dateStr < todayStr;
+    const dayTasks = tasksByDay[d] || [];
+    html += `<div class="cal-day${isToday ? ' today' : ''}"><div class="cal-day-num">${d}</div>`;
+    dayTasks.slice(0, 2).forEach(t => {
+      const cls = isPast ? 'overdue' : isToday ? 'today-ev' : t.cat === 'prazo' ? 'prazo' : 'other';
+      const icon = CATS[t.cat]?.icon || '';
+      html += `<div class="cal-event ${cls}" onclick="openDetail('${t._id}')" title="${esc(t.title)}">${icon} ${esc(t.title)}</div>`;
+    });
+    if (dayTasks.length > 2) html += `<div class="cal-more">+${dayTasks.length - 2} mais</div>`;
+    html += `</div>`;
+  }
+
+  const trailing = (startDow + totalDays) % 7;
+  for (let d = 1; d <= (trailing === 0 ? 0 : 7 - trailing); d++) {
+    html += `<div class="cal-day other-month"><div class="cal-day-num">${d}</div></div>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="cal-legend">`;
+  html += `<div class="cal-legend-item"><div class="cal-legend-dot" style="background:#FDECEA;border-left-color:var(--red)"></div>Vencido</div>`;
+  html += `<div class="cal-legend-item"><div class="cal-legend-dot" style="background:#FFF3DC;border-left-color:var(--amber)"></div>Hoje</div>`;
+  html += `<div class="cal-legend-item"><div class="cal-legend-dot" style="background:var(--prazo-bg);border-left-color:var(--prazo-sel)"></div>Prazo judicial</div>`;
+  html += `<div class="cal-legend-item"><div class="cal-legend-dot" style="background:var(--bg2);border-left-color:var(--border2)"></div>Outros</div>`;
+  html += `</div></div>`;
+
+  el.innerHTML = html;
+}
+
+window.calPrev  = function () { calMonth--; if (calMonth < 0)  { calMonth = 11; calYear--; } renderCalendar(); };
+window.calNext  = function () { calMonth++; if (calMonth > 11) { calMonth = 0;  calYear++; } renderCalendar(); };
+window.calToday = function () { const d = new Date(); calYear = d.getFullYear(); calMonth = d.getMonth(); renderCalendar(); };
 
 // ── Data no header ────────────────────────────────────────────
 (function () {
@@ -357,7 +454,9 @@ window.openDetail = function (id) {
   document.getElementById('detail-meta').innerHTML =
     `<span class="chip ${CATS[t.cat]?.cls || 'outro'}">${CATS[t.cat]?.icon || ''} ${CATS[t.cat]?.label || t.cat}</span>` +
     `<span style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)"><span style="width:8px;height:8px;border-radius:50%;background:${pc.color};display:inline-block;flex-shrink:0"></span>${prioLabel}</span>` +
-    (t.date ? `<span class="task-date ${dc}"><i class="ti ${di}" style="font-size:12px"></i> ${s === 'overdue' ? 'Venceu ' + fmtDate(t.date) : s === 'today' ? 'Hoje' : fmtDate(t.date)}</span>` : '');
+    (t.date ? `<span class="task-date ${dc}"><i class="ti ${di}" style="font-size:12px"></i> ${s === 'overdue' ? 'Venceu ' + fmtDate(t.date) : s === 'today' ? 'Hoje' : fmtDate(t.date)}</span>` : '') +
+    (t.cat === 'prazo' && t.processo ? `<div style="width:100%;margin-top:6px;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:5px"><i class="ti ti-file-text" style="font-size:12px;flex-shrink:0"></i><strong style="font-weight:500">${esc(t.processo)}</strong></div>` : '') +
+    (t.cat === 'prazo' && (t.autor || t.reu) ? `<div style="width:100%;font-size:13px;color:var(--prazo-c);font-weight:500;margin-top:2px">${esc(t.autor || '—')} <span style="color:var(--text3);font-weight:400">×</span> ${esc(t.reu || '—')}</div>` : '');
 
   const noteEl = document.getElementById('detail-note-text');
   noteEl.textContent = t.note || '';
