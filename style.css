@@ -140,8 +140,15 @@ body { font-family: var(--font); background: var(--bg3); color: var(--text); min
 .chip.reuniao { background: var(--reuniao-bg); color: var(--reuniao-c); border-color: var(--reuniao-bd); } .chip.reuniao.sel { background: var(--reuniao-sel); color: #fff; }
 .chip.outro { background: var(--outro-bg); color: var(--outro-c); border-color: var(--outro-bd); } .chip.outro.sel { background: var(--outro-sel); color: #fff; }
 
+/* ── Grid de tarefas (duas colunas no desktop) ───────────────── */
+@media (min-width: 860px) {
+  #list .task-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #list .section-label { grid-column: 1 / -1; }
+}
+
 /* ── Cards de tarefa ─────────────────────────────────────────── */
 .task-card { display: flex; gap: 10px; align-items: flex-start; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: .875rem 1rem; margin-bottom: 6px; }
+@media (min-width: 860px) { .task-card { margin-bottom: 0; } }
 .task-card:hover { border-color: var(--border2); box-shadow: var(--shadow); }
 .task-card.done { opacity: .5; } .task-card.done .task-title { text-decoration: line-through; }
 .prio-bar { width: 3px; border-radius: 2px; align-self: stretch; flex-shrink: 0; min-height: 20px; }
