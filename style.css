@@ -150,8 +150,9 @@ body { font-family: var(--font); background: var(--bg3); color: var(--text); min
 
 /* ── Grid de tarefas (duas colunas no desktop) ───────────────── */
 @media (min-width: 860px) {
-  #list .task-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #list .task-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: start; }
   #list .section-label { grid-column: 1 / -1; }
+  #list .task-grid .task-card { margin-bottom: 0; }
 }
 
 /* ── Cards de tarefa ─────────────────────────────────────────── */
