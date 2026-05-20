@@ -279,6 +279,9 @@ input[type=number]:focus { outline: none; border-color: var(--text2); }
 .pay-sum-card.pay-sum-red .pay-sum-val { color: var(--red); }
 
 .pay-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 1rem; }
+@media (min-width: 860px) {
+  .pay-list { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+}
 .pay-item { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: .5rem .875rem; transition: border-color .15s, box-shadow .15s; }
 .pay-item:hover { border-color: var(--border2); box-shadow: var(--shadow); }
 .pay-item.paid { opacity: .5; }
