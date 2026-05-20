@@ -7,7 +7,7 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc
 // ── Config ────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey:            "AIzaSyB5dmG3a12WDdE13jzKTfv9C65igNmhveU",
-  authDomain:        "birdy---to-do-s.firebaseapp.com",
+  authDomain:        "birdy-tarefas.web.app",
   projectId:         "birdy---to-do-s",
   storageBucket:     "birdy---to-do-s.firebasestorage.app",
   messagingSenderId: "564307060103",
@@ -37,6 +37,8 @@ const PRIO = {
   baixa: { color: '#B4B2A9' },
 };
 let tasks = [], view = 'pending', filterCat = 'all', sortBy = 'prio', editId = null;
+let payments = [], payYear = new Date().getFullYear(), payMonth = new Date().getMonth();
+let unsubPayments = null, editPaymentId = null;
 let calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
 let unsubTasks = null;
 let searchQuery = '';
@@ -54,12 +56,14 @@ onAuthStateChanged(auth, user => {
     document.getElementById('user-avatar').src = user.photoURL || '';
     document.getElementById('user-avatar').style.display = user.photoURL ? '' : 'none';
     startListening(user.uid);
+    startListeningPayments(user.uid);
   } else {
     document.getElementById('login-screen').classList.remove('hidden');
     document.getElementById('main-app').style.display = 'none';
     document.getElementById('fab').style.display = 'none';
     if (unsubTasks) { unsubTasks(); unsubTasks = null; }
-    tasks = [];
+    if (unsubPayments) { unsubPayments(); unsubPayments = null; }
+    tasks = []; payments = [];
   }
 });
 
@@ -224,12 +228,19 @@ window.deleteTask = async function (id) {
 
 window.setView = function (v) {
   view = v;
-  ['pending', 'today', 'done', 'calendar'].forEach(x => document.getElementById('tab-' + x).classList.toggle('active', x === v));
-  const isCal = v === 'calendar';
-  document.querySelector('.search-wrap').style.display = isCal ? 'none' : '';
-  document.getElementById('filters').style.display     = isCal ? 'none' : '';
-  document.querySelector('.sort-row').style.display    = isCal ? 'none' : '';
+  ['pending', 'today', 'done', 'calendar', 'payments'].forEach(x => document.getElementById('tab-' + x).classList.toggle('active', x === v));
+  const hideToolbar = v === 'calendar' || v === 'payments';
+  document.querySelector('.search-wrap').style.display = hideToolbar ? 'none' : '';
+  document.getElementById('filters').style.display     = hideToolbar ? 'none' : '';
+  document.querySelector('.sort-row').style.display    = hideToolbar ? 'none' : '';
+  const fab = document.getElementById('fab');
+  fab.setAttribute('aria-label', v === 'payments' ? 'Novo pagamento' : 'Nova tarefa');
   render();
+};
+
+window.fabAction = function () {
+  if (view === 'payments') openPaymentModal();
+  else openModal();
 };
 
 // ── Render ────────────────────────────────────────────────────
@@ -335,7 +346,9 @@ function renderList() {
 
 window.render = function () {
   renderStats();
-  if (view === 'calendar') { renderCalendar(); } else { renderFilters(); renderList(); }
+  if (view === 'payments')      { renderPayments(); }
+  else if (view === 'calendar') { renderCalendar(); }
+  else                          { renderFilters(); renderList(); }
 };
 
 // ── Calendário ────────────────────────────────────────────────
@@ -415,7 +428,7 @@ window.calToday = function () { const d = new Date(); calYear = d.getFullYear();
   document.getElementById('date-label').textContent = `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;
 })();
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDetail(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDetail(); closePaymentModal(); } });
 
 // ── Busca ─────────────────────────────────────────────────────
 window.setSearch = function (val) {
@@ -585,3 +598,200 @@ window.cycleTheme = function () {
 
 syncThemeIcon();
 render();
+
+// ── Pagamentos ────────────────────────────────────────────────
+function pad2(n) { return String(n).padStart(2, '0'); }
+function fmtBRL(v) { return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+function payMonthStr(y, m) { return `${y}-${pad2(m + 1)}`; }
+
+function getPayCol() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return null;
+  return collection(db, 'users', uid, 'payments');
+}
+
+function startListeningPayments(uid) {
+  if (unsubPayments) { unsubPayments(); unsubPayments = null; }
+  const COL = collection(db, 'users', uid, 'payments');
+  unsubPayments = onSnapshot(COL,
+    snap => {
+      payments = snap.docs.map(d => ({ ...d.data(), _id: d.id }));
+      if (view === 'payments') renderPayments();
+    },
+    err => { console.error(err); }
+  );
+}
+
+function renderPayments() {
+  const el   = document.getElementById('list');
+  const mStr = payMonthStr(payYear, payMonth);
+
+  const list = payments
+    .filter(p => p.month === mStr)
+    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+
+  const total   = list.reduce((s, p) => s + (p.amount || 0), 0);
+  const paidAmt = list.filter(p => p.paid).reduce((s, p) => s + (p.amount || 0), 0);
+  const pendAmt = total - paidAmt;
+
+  let html = `<div class="pay-wrap">`;
+
+  html += `<div class="pay-header">
+    <div class="pay-month-title">${CAL_MONTHS[payMonth]} ${payYear}</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="cal-nav">
+        <button onclick="payPrev()"><i class="ti ti-chevron-left"></i></button>
+        <button onclick="payNext()"><i class="ti ti-chevron-right"></i></button>
+      </div>
+      <button class="cal-today-btn" onclick="payThisMonth()">Este mês</button>
+    </div>
+  </div>`;
+
+  html += `<div class="pay-summary">
+    <div class="pay-sum-card">
+      <div class="pay-sum-val">${fmtBRL(total)}</div>
+      <div class="pay-sum-lbl">Total do mês</div>
+    </div>
+    <div class="pay-sum-card pay-sum-green">
+      <div class="pay-sum-val">${fmtBRL(paidAmt)}</div>
+      <div class="pay-sum-lbl">Pago</div>
+    </div>
+    <div class="pay-sum-card${pendAmt > 0 ? ' pay-sum-red' : ' pay-sum-green'}">
+      <div class="pay-sum-val">${fmtBRL(pendAmt)}</div>
+      <div class="pay-sum-lbl">Pendente</div>
+    </div>
+  </div>`;
+
+  if (!list.length) {
+    html += `<div class="empty"><i class="ti ti-receipt-off"></i>Nenhum pagamento para este mês.</div>`;
+  } else {
+    html += `<div class="pay-list">`;
+    list.forEach(p => { html += paymentHtml(p); });
+    html += `</div>`;
+  }
+
+  html += `<div class="pay-actions-row">
+    <button class="btn-pay-secondary" onclick="copyPrevMonth()"><i class="ti ti-copy"></i> Copiar mês anterior</button>
+    <button class="btn-new" onclick="openPaymentModal()"><i class="ti ti-plus" aria-hidden="true"></i> Novo pagamento</button>
+  </div>`;
+
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function paymentHtml(p) {
+  const dateStr = p.dueDate
+    ? `<span class="pay-item-date"><i class="ti ti-calendar" style="font-size:11px"></i> Vence ${fmtDate(p.dueDate)}</span>`
+    : '';
+  return `<div class="pay-item${p.paid ? ' paid' : ''}">` +
+    `<div class="pay-item-check${p.paid ? ' checked' : ''}" onclick="togglePaymentPaid('${p._id}')" role="checkbox" aria-checked="${p.paid}" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter')togglePaymentPaid('${p._id}')">` +
+      (p.paid ? '<i class="ti ti-check" style="font-size:11px;color:var(--bg)"></i>' : '') +
+    `</div>` +
+    `<div class="pay-item-body">` +
+      `<div class="pay-item-desc">${esc(p.description)}</div>` +
+      dateStr +
+    `</div>` +
+    `<div class="pay-item-amount${p.paid ? ' paid-amount' : ''}">${fmtBRL(p.amount)}</div>` +
+    `<div class="task-actions">` +
+      `<button class="icon-btn" onclick="openPaymentModal('${p._id}')" aria-label="Editar"><i class="ti ti-edit"></i></button>` +
+      `<button class="icon-btn" onclick="deletePayment('${p._id}')" aria-label="Excluir"><i class="ti ti-trash"></i></button>` +
+    `</div>` +
+  `</div>`;
+}
+
+window.payPrev = function () { payMonth--; if (payMonth < 0)  { payMonth = 11; payYear--; } renderPayments(); };
+window.payNext = function () { payMonth++; if (payMonth > 11) { payMonth = 0;  payYear++; } renderPayments(); };
+window.payThisMonth = function () { const d = new Date(); payYear = d.getFullYear(); payMonth = d.getMonth(); renderPayments(); };
+
+window.openPaymentModal = function (id) {
+  editPaymentId = id || null;
+  const p = id ? payments.find(x => x._id === id) : null;
+  document.getElementById('pay-modal-title').textContent = id ? 'Editar pagamento' : 'Novo pagamento';
+  document.getElementById('pay-modal-save-btn').querySelector('.btn-label').textContent = id ? 'Salvar' : 'Adicionar';
+  document.getElementById('pm-desc').value   = p ? (p.description || '') : '';
+  document.getElementById('pm-amount').value = p ? (p.amount  || '') : '';
+  document.getElementById('pm-date').value   = p ? (p.dueDate || '') : '';
+  document.getElementById('pay-modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('pm-desc').focus(), 100);
+};
+
+window.closePaymentModal = function () {
+  document.getElementById('pay-modal-overlay').classList.remove('open');
+  editPaymentId = null;
+};
+
+window.handlePayModalOverlay = function (e) {
+  if (e.target.id === 'pay-modal-overlay') closePaymentModal();
+};
+
+window.savePaymentModal = async function () {
+  const description = document.getElementById('pm-desc').value.trim();
+  if (!description) { document.getElementById('pm-desc').focus(); return; }
+  const amount  = parseFloat(document.getElementById('pm-amount').value) || 0;
+  const dueDate = document.getElementById('pm-date').value;
+  const COL = getPayCol(); if (!COL) return;
+  const btn = document.getElementById('pay-modal-save-btn');
+  btn.classList.add('loading');
+  const mStr = payMonthStr(payYear, payMonth);
+  const data = { description, amount, dueDate, month: mStr };
+  try {
+    if (editPaymentId) {
+      await updateDoc(doc(db, 'users', auth.currentUser.uid, 'payments', editPaymentId), data);
+      showToast('Pagamento atualizado');
+    } else {
+      data.paid = false; data.added = serverTimestamp();
+      await addDoc(COL, data);
+      showToast('Pagamento adicionado');
+    }
+    closePaymentModal();
+  } catch (e) {
+    console.error(e);
+    showToast('Erro ao salvar. Tente novamente.');
+  } finally {
+    btn.classList.remove('loading');
+  }
+};
+
+window.togglePaymentPaid = async function (id) {
+  const p = payments.find(x => x._id === id); if (!p) return;
+  try {
+    await updateDoc(doc(db, 'users', auth.currentUser.uid, 'payments', id), { paid: !p.paid });
+  } catch (e) { showToast('Erro ao atualizar.'); }
+};
+
+window.deletePayment = async function (id) {
+  if (!confirm('Excluir este pagamento?')) return;
+  try {
+    await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'payments', id));
+    showToast('Pagamento excluído');
+  } catch (e) { showToast('Erro ao excluir.'); }
+};
+
+window.copyPrevMonth = async function () {
+  let prevY = payYear, prevM = payMonth - 1;
+  if (prevM < 0) { prevM = 11; prevY--; }
+  const prevList = payments.filter(p => p.month === payMonthStr(prevY, prevM));
+  if (!prevList.length) {
+    showToast(`Nenhum pagamento em ${CAL_MONTHS[prevM]}.`);
+    return;
+  }
+  if (!confirm(`Copiar ${prevList.length} pagamento(s) de ${CAL_MONTHS[prevM]} para ${CAL_MONTHS[payMonth]}?`)) return;
+  const COL = getPayCol(); if (!COL) return;
+  const mStr = payMonthStr(payYear, payMonth);
+  try {
+    await Promise.all(prevList.map(p => {
+      let newDate = '';
+      if (p.dueDate) {
+        const [, , dd] = p.dueDate.split('-').map(Number);
+        const lastDay = new Date(payYear, payMonth + 1, 0).getDate();
+        newDate = `${payYear}-${pad2(payMonth + 1)}-${pad2(Math.min(dd, lastDay))}`;
+      }
+      return addDoc(COL, { description: p.description, amount: p.amount, dueDate: newDate, month: mStr, paid: false, added: serverTimestamp() });
+    }));
+    showToast(`${prevList.length} pagamento(s) copiado(s)!`);
+  } catch (e) {
+    console.error(e);
+    showToast('Erro ao copiar pagamentos.');
+  }
+};
+

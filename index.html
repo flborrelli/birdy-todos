@@ -121,6 +121,7 @@
       <button class="tab" onclick="setView('today')" id="tab-today"><i class="ti ti-alert-triangle" aria-hidden="true"></i><span>Urgentes</span></button>
       <button class="tab" onclick="setView('done')" id="tab-done"><i class="ti ti-check" aria-hidden="true"></i><span>Concluídas</span></button>
       <button class="tab" onclick="setView('calendar')" id="tab-calendar"><i class="ti ti-calendar-month" aria-hidden="true"></i><span>Calendário</span></button>
+      <button class="tab" onclick="setView('payments')" id="tab-payments"><i class="ti ti-receipt" aria-hidden="true"></i><span>Pagamentos</span></button>
     </div>
   </aside>
   <div class="content">
@@ -147,7 +148,7 @@
   </div>
 </div>
 
-<button class="fab" onclick="openModal()" aria-label="Nova tarefa" id="fab">
+<button class="fab" onclick="fabAction()" aria-label="Nova tarefa" id="fab">
   <i class="ti ti-plus" aria-hidden="true"></i>
 </button>
 
@@ -221,6 +222,28 @@
       </div>
     </div>
     <div class="postit-board" id="postit-board"></div>
+  </div>
+</div>
+
+<!-- Modal de pagamento -->
+<div class="modal-overlay" id="pay-modal-overlay" onclick="handlePayModalOverlay(event)" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title-text" id="pay-modal-title">Novo pagamento</span>
+      <button class="icon-btn" onclick="closePaymentModal()" aria-label="Fechar"><i class="ti ti-x"></i></button>
+    </div>
+    <input type="text" id="pm-desc" placeholder="Descrição (ex: Aluguel, Internet…)" style="width:100%;margin-bottom:8px" onkeydown="if(event.key==='Enter')document.getElementById('pm-amount').focus()">
+    <div class="mfr" style="grid-template-columns:1fr 1fr">
+      <input type="number" id="pm-amount" placeholder="Valor (R$)" step="0.01" min="0" onkeydown="if(event.key==='Enter')savePaymentModal()">
+      <input type="date" id="pm-date">
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closePaymentModal()">Cancelar</button>
+      <button class="btn-add" onclick="savePaymentModal()" id="pay-modal-save-btn">
+        <div class="spinner"></div>
+        <span class="btn-label">Adicionar</span>
+      </button>
+    </div>
   </div>
 </div>
 

@@ -261,6 +261,47 @@ textarea { resize: vertical; min-height: 60px; margin-top: 8px; }
 :root[data-theme="dark"] .cal-event.overdue { background: rgba(226,75,74,.15); color: #ff7875; border-left-color: #ff7875; }
 :root[data-theme="dark"] .cal-event.today-ev { background: rgba(186,117,23,.15); color: #ffc069; border-left-color: #ffc069; }
 
+/* ── Pagamentos ──────────────────────────────────────────────── */
+input[type=number] { width: 100%; padding: 8px 10px; border: 0.5px solid var(--border2); border-radius: var(--radius); font-size: 14px; background: var(--bg); color: var(--text); font-family: var(--font); -webkit-appearance: none; appearance: none; }
+input[type=number]:focus { outline: none; border-color: var(--text2); }
+
+.pay-wrap { padding-bottom: 1rem; }
+.pay-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; gap: 8px; flex-wrap: wrap; }
+.pay-month-title { font-size: 16px; font-weight: 600; color: var(--text); }
+
+.pay-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1.25rem; }
+.pay-sum-card { background: var(--bg2); border-radius: var(--radius); padding: .875rem .75rem; text-align: center; }
+.pay-sum-card.pay-sum-green { background: #EAF3DE; }
+.pay-sum-card.pay-sum-red { background: #FDECEA; }
+.pay-sum-val { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.2; word-break: break-word; }
+.pay-sum-lbl { font-size: 10px; color: var(--text3); margin-top: 4px; text-transform: uppercase; letter-spacing: .3px; }
+.pay-sum-card.pay-sum-green .pay-sum-val { color: var(--green); }
+.pay-sum-card.pay-sum-red .pay-sum-val { color: var(--red); }
+
+.pay-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem; }
+.pay-item { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: .75rem 1rem; transition: border-color .15s, box-shadow .15s; }
+.pay-item:hover { border-color: var(--border2); box-shadow: var(--shadow); }
+.pay-item.paid { opacity: .55; }
+.pay-item-check { width: 19px; height: 19px; border: 0.5px solid var(--border2); border-radius: 5px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+.pay-item-check.checked { background: var(--green); border-color: var(--green); }
+.pay-item-body { flex: 1; min-width: 0; }
+.pay-item-desc { font-size: 14px; color: var(--text); line-height: 1.4; }
+.pay-item.paid .pay-item-desc { text-decoration: line-through; color: var(--text3); }
+.pay-item-date { font-size: 11px; color: var(--text3); margin-top: 2px; display: flex; align-items: center; gap: 3px; }
+.pay-item-amount { font-size: 14px; font-weight: 600; color: var(--text); flex-shrink: 0; white-space: nowrap; }
+.pay-item-amount.paid-amount { color: var(--text3); }
+
+.pay-actions-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: .75rem; flex-wrap: wrap; }
+.btn-pay-secondary { display: flex; align-items: center; gap: 5px; padding: 7px 12px; background: transparent; border: 0.5px solid var(--border2); border-radius: var(--radius); font-size: 13px; color: var(--text2); cursor: pointer; font-family: var(--font); }
+.btn-pay-secondary:hover { background: var(--bg2); color: var(--text); }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pay-sum-card.pay-sum-green { background: rgba(59,109,17,.2); }
+  :root:not([data-theme="light"]) .pay-sum-card.pay-sum-red   { background: rgba(226,75,74,.15); }
+}
+:root[data-theme="dark"] .pay-sum-card.pay-sum-green { background: rgba(59,109,17,.2); }
+:root[data-theme="dark"] .pay-sum-card.pay-sum-red   { background: rgba(226,75,74,.15); }
+
 /* ── Animações ───────────────────────────────────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
