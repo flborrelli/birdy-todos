@@ -278,17 +278,18 @@ input[type=number]:focus { outline: none; border-color: var(--text2); }
 .pay-sum-card.pay-sum-green .pay-sum-val { color: var(--green); }
 .pay-sum-card.pay-sum-red .pay-sum-val { color: var(--red); }
 
-.pay-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem; }
-.pay-item { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: .75rem 1rem; transition: border-color .15s, box-shadow .15s; }
+.pay-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 1rem; }
+.pay-item { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: .5rem .875rem; transition: border-color .15s, box-shadow .15s; }
 .pay-item:hover { border-color: var(--border2); box-shadow: var(--shadow); }
-.pay-item.paid { opacity: .55; }
-.pay-item-check { width: 19px; height: 19px; border: 0.5px solid var(--border2); border-radius: 5px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+.pay-item.paid { opacity: .5; }
+.pay-item-check { width: 18px; height: 18px; border: 0.5px solid var(--border2); border-radius: 4px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); }
 .pay-item-check.checked { background: var(--green); border-color: var(--green); }
 .pay-item-body { flex: 1; min-width: 0; }
-.pay-item-desc { font-size: 14px; color: var(--text); line-height: 1.4; }
+.pay-item-desc { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pay-item.paid .pay-item-desc { text-decoration: line-through; color: var(--text3); }
-.pay-item-date { font-size: 11px; color: var(--text3); margin-top: 2px; display: flex; align-items: center; gap: 3px; }
-.pay-item-amount { font-size: 14px; font-weight: 600; color: var(--text); flex-shrink: 0; white-space: nowrap; }
+.pay-item-date { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; white-space: nowrap; flex-shrink: 0; color: #E8922A; }
+.pay-item-date.date-overdue { color: var(--red); }
+.pay-item-amount { font-size: 13px; font-weight: 600; color: var(--text); flex-shrink: 0; white-space: nowrap; }
 .pay-item-amount.paid-amount { color: var(--text3); }
 
 .pay-actions-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: .75rem; flex-wrap: wrap; }

@@ -680,23 +680,32 @@ function renderPayments() {
 }
 
 function paymentHtml(p) {
-  const dateStr = p.dueDate
-    ? `<span class="pay-item-date"><i class="ti ti-calendar" style="font-size:11px"></i> Vence ${fmtDate(p.dueDate)}</span>`
+  const s = dateStatus(p.dueDate);
+  const dateCls = s === 'overdue' ? 'date-overdue' : (s === 'today' || s === 'soon') ? 'date-soon' : 'date-normal';
+  const dateIcon = s === 'overdue' ? 'ti-alert-circle' : 'ti-calendar';
+  const dateLabel = p.dueDate ? fmtPayDate(p.dueDate) : '';
+  const dateBadge = p.dueDate
+    ? `<span class="pay-item-date ${dateCls}"><i class="ti ${dateIcon}" style="font-size:10px"></i> ${dateLabel}</span>`
     : '';
   return `<div class="pay-item${p.paid ? ' paid' : ''}">` +
     `<div class="pay-item-check${p.paid ? ' checked' : ''}" onclick="togglePaymentPaid('${p._id}')" role="checkbox" aria-checked="${p.paid}" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter')togglePaymentPaid('${p._id}')">` +
-      (p.paid ? '<i class="ti ti-check" style="font-size:11px;color:var(--bg)"></i>' : '') +
+      (p.paid ? '<i class="ti ti-check" style="font-size:10px;color:var(--bg)"></i>' : '') +
     `</div>` +
-    `<div class="pay-item-body">` +
-      `<div class="pay-item-desc">${esc(p.description)}</div>` +
-      dateStr +
-    `</div>` +
+    `<div class="pay-item-body"><div class="pay-item-desc">${esc(p.description)}</div></div>` +
+    dateBadge +
     `<div class="pay-item-amount${p.paid ? ' paid-amount' : ''}">${fmtBRL(p.amount)}</div>` +
     `<div class="task-actions">` +
       `<button class="icon-btn" onclick="openPaymentModal('${p._id}')" aria-label="Editar"><i class="ti ti-edit"></i></button>` +
       `<button class="icon-btn" onclick="deletePayment('${p._id}')" aria-label="Excluir"><i class="ti ti-trash"></i></button>` +
     `</div>` +
   `</div>`;
+}
+
+function fmtPayDate(d) {
+  if (!d) return '';
+  const [, m, dd] = d.split('-');
+  const months = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  return `${dd} ${months[parseInt(m) - 1]}`;
 }
 
 window.payPrev = function () { payMonth--; if (payMonth < 0)  { payMonth = 11; payYear--; } renderPayments(); };
