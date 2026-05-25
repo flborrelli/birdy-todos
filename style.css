@@ -116,8 +116,9 @@ body { font-family: var(--font); background: var(--bg3); color: var(--text); min
 .stat-l { font-size: 10px; color: var(--text3); margin-top: 3px; text-transform: uppercase; letter-spacing: .3px; }
 
 /* ── Tabs ────────────────────────────────────────────────────── */
-.tabs { display: flex; border-top: 0.5px solid var(--border); }
-.tab { flex: 1; padding: 10px 6px 9px; border: none; background: transparent; font-size: 13px; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -0.5px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+.tabs { display: flex; border-top: 0.5px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; padding: 10px 12px 9px; border: none; background: transparent; font-size: 13px; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -0.5px; display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; }
 .tab.active { color: var(--text); border-bottom-color: var(--text); font-weight: 500; }
 @media (min-width: 860px) {
   .tabs { flex-direction: column; border-top: none; gap: 2px; }
