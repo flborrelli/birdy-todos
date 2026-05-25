@@ -230,6 +230,7 @@ window.setFilter = function (cat) { filterCat = cat; render(); };
 
 window.setView = function (v) {
   view = v;
+  filterCat = 'all';
   ['pending', 'today', 'done', 'calendar', 'payments'].forEach(x => document.getElementById('tab-' + x).classList.toggle('active', x === v));
   const hideToolbar = v === 'calendar' || v === 'payments';
   document.querySelector('.search-wrap').style.display = hideToolbar ? 'none' : '';
