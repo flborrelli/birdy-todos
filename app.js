@@ -270,10 +270,10 @@ function renderStats() {
   const tod   = pend.filter(x => { const s = dateStatus(x.date); return s === 'overdue' || s === 'today'; });
   const done7 = tasks.filter(x => x.done && x.doneAt && Date.now() - x.doneAt < 7 * 86400000);
   document.getElementById('stats').innerHTML =
-    `<div class="stat"><div class="stat-n">${pend.length}</div><div class="stat-l">Pendentes</div></div>` +
-    `<div class="stat"><div class="stat-n red">${urg.length}</div><div class="stat-l">Urgentes</div></div>` +
-    `<div class="stat"><div class="stat-n amber">${tod.length}</div><div class="stat-l">Para hoje</div></div>` +
-    `<div class="stat"><div class="stat-n green">${done7.length}</div><div class="stat-l">Concluídas 7d</div></div>`;
+    `<div class="stat stat-btn" onclick="setView('pending')" title="Ver pendentes"><div class="stat-n">${pend.length}</div><div class="stat-l">Pendentes</div></div>` +
+    `<div class="stat stat-btn" onclick="setView('today')" title="Ver urgentes"><div class="stat-n red">${urg.length}</div><div class="stat-l">Urgentes</div></div>` +
+    `<div class="stat stat-btn" onclick="setView('today')" title="Ver para hoje"><div class="stat-n amber">${tod.length}</div><div class="stat-l">Para hoje</div></div>` +
+    `<div class="stat stat-btn" onclick="setView('done')" title="Ver concluídas"><div class="stat-n green">${done7.length}</div><div class="stat-l">Concluídas 7d</div></div>`;
 }
 
 function renderFilters() {
