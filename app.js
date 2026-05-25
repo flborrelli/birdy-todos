@@ -226,6 +226,8 @@ window.deleteTask = async function (id) {
   } catch (e) { showToast('Erro ao excluir.'); }
 };
 
+window.setFilter = function (cat) { filterCat = cat; render(); };
+
 window.setView = function (v) {
   view = v;
   ['pending', 'today', 'done', 'calendar', 'payments'].forEach(x => document.getElementById('tab-' + x).classList.toggle('active', x === v));
@@ -279,8 +281,8 @@ function renderStats() {
 function renderFilters() {
   const used = Object.keys(CATS).filter(c => tasks.some(t => t.cat === c));
   document.getElementById('filters').innerHTML =
-    `<span class="chip all${filterCat === 'all' ? ' sel' : ''}" onclick="filterCat='all';render()">Todas</span>` +
-    used.map(c => `<span class="chip ${CATS[c].cls}${filterCat === c ? ' sel' : ''}" onclick="filterCat='${c}';render()">${CATS[c].icon} ${CATS[c].label}</span>`).join('');
+    `<span class="chip all${filterCat === 'all' ? ' sel' : ''}" onclick="setFilter('all')">Todas</span>` +
+    used.map(c => `<span class="chip ${CATS[c].cls}${filterCat === c ? ' sel' : ''}" onclick="setFilter('${c}')">${CATS[c].icon} ${CATS[c].label}</span>`).join('');
 }
 
 function taskHtml(t) {
