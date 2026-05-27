@@ -614,11 +614,13 @@ window.openDetail = function (id) {
   initNoteColors();
 
   document.getElementById('detail-overlay').classList.add('open');
+  document.getElementById('main-app').classList.add('detail-open');
   startListeningNotes(id);
 };
 
 window.closeDetail = function () {
   document.getElementById('detail-overlay').classList.remove('open');
+  document.getElementById('main-app').classList.remove('detail-open');
   if (unsubNotes) { unsubNotes(); unsubNotes = null; }
   detailTaskId = null;
 };

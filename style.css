@@ -561,3 +561,50 @@ input[type=number]:focus { outline: none; border-color: var(--text2); }
   border-color: var(--prazo-sel);
   background: var(--prazo-bg);
 }
+
+/* ─────────────────────────────────────────
+   Painel de detalhe lateral (desktop ≥860px)
+   No mobile continua como modal overlay
+   ───────────────────────────────────────── */
+
+@media (min-width: 860px) {
+  /* Overlay sem fundo escuro — só o painel à direita */
+  #detail-overlay {
+    background: transparent;
+    left: auto;          /* cancela o inset:0 do lado esquerdo */
+    width: 380px;
+    padding: 0;
+    align-items: stretch;
+    justify-content: flex-end;
+    pointer-events: none; /* área fora do painel permanece clicável */
+  }
+
+  /* Painel em si desliza da direita */
+  #detail-overlay .detail-modal {
+    max-width: 100%;
+    max-height: none;
+    height: 100dvh;
+    border-radius: 0;
+    border-left: 0.5px solid var(--border2);
+    box-shadow: -6px 0 32px rgba(0,0,0,0.10);
+    transform: translateX(100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: all;
+    overflow-y: auto;
+    margin: 0;
+  }
+
+  #detail-overlay.open {
+    pointer-events: none; /* só o painel recebe eventos */
+  }
+
+  #detail-overlay.open .detail-modal {
+    transform: translateX(0);
+  }
+
+  /* Empurra o conteúdo principal quando o painel está aberto */
+  .app.detail-open .content {
+    margin-right: 380px;
+    transition: margin-right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
