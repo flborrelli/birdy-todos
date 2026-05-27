@@ -616,7 +616,7 @@ input[type=number]:focus { outline: none; border-color: var(--text2); }
    Subtarefas no painel de detalhe
    ───────────────────────────────────────── */
 #detail-subtasks {
-  margin: 12px 0 20px;
+  margin: 12px 0 40px;
 }
 
 .subtask-header {
