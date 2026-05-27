@@ -123,6 +123,14 @@
       <button class="tab" onclick="setView('calendar')" id="tab-calendar"><i class="ti ti-calendar-month" aria-hidden="true"></i><span>Calendário</span></button>
       <button class="tab" onclick="setView('payments')" id="tab-payments"><i class="ti ti-receipt" aria-hidden="true"></i><span>Pagamentos</span></button>
     </div>
+    <div class="sidebar-divider" style="display:block;margin:.75rem 0 .5rem"></div>
+    <div class="lists-section">
+      <div class="lists-section-header">
+        <span class="lists-section-label"><i class="ti ti-layout-list" aria-hidden="true"></i> Minhas listas</span>
+        <button class="btn-new-list" onclick="openListModal()" title="Nova lista"><i class="ti ti-plus"></i></button>
+      </div>
+      <div id="lists-nav"></div>
+    </div>
   </aside>
   <div class="content">
     <div class="sync-bar">
@@ -159,6 +167,7 @@
       <button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><i class="ti ti-x"></i></button>
     </div>
     <input type="text" id="m-title" placeholder="Descrição da tarefa…" style="width:100%;margin-bottom:8px" onkeydown="if(event.key==='Enter')saveModal()">
+    <select id="m-list" style="width:100%;margin-bottom:8px"></select>
     <div class="mfr">
       <select id="m-cat" onchange="togglePrazoFields()">
         <option value="prazo">⚖️ Prazo judicial</option>
@@ -242,6 +251,49 @@
       <button class="btn-add" onclick="savePaymentModal()" id="pay-modal-save-btn">
         <div class="spinner"></div>
         <span class="btn-label">Adicionar</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de lista (criar / editar) -->
+<div class="modal-overlay" id="list-modal-overlay" onclick="if(event.target===this)closeListModal()" role="dialog" aria-modal="true">
+  <div class="modal list-modal">
+    <div class="modal-header">
+      <span class="modal-title-text" id="list-modal-title">Nova lista</span>
+      <button class="icon-btn" onclick="closeListModal()" aria-label="Fechar"><i class="ti ti-x"></i></button>
+    </div>
+
+    <!-- Emoji picker -->
+    <p style="font-size:.75rem;color:var(--text2);margin:0 0 6px">Escolha um emoji</p>
+    <div class="list-emoji-grid" id="list-emoji-grid">
+      <button class="list-emoji-btn" data-emoji="📋" onclick="selectListEmoji(this)">📋</button>
+      <button class="list-emoji-btn" data-emoji="💼" onclick="selectListEmoji(this)">💼</button>
+      <button class="list-emoji-btn" data-emoji="🏠" onclick="selectListEmoji(this)">🏠</button>
+      <button class="list-emoji-btn" data-emoji="🚀" onclick="selectListEmoji(this)">🚀</button>
+      <button class="list-emoji-btn" data-emoji="🎯" onclick="selectListEmoji(this)">🎯</button>
+      <button class="list-emoji-btn" data-emoji="📚" onclick="selectListEmoji(this)">📚</button>
+      <button class="list-emoji-btn" data-emoji="💡" onclick="selectListEmoji(this)">💡</button>
+      <button class="list-emoji-btn" data-emoji="🔧" onclick="selectListEmoji(this)">🔧</button>
+      <button class="list-emoji-btn" data-emoji="🌿" onclick="selectListEmoji(this)">🌿</button>
+      <button class="list-emoji-btn" data-emoji="⭐" onclick="selectListEmoji(this)">⭐</button>
+      <button class="list-emoji-btn" data-emoji="🔥" onclick="selectListEmoji(this)">🔥</button>
+      <button class="list-emoji-btn" data-emoji="🎨" onclick="selectListEmoji(this)">🎨</button>
+      <button class="list-emoji-btn" data-emoji="📈" onclick="selectListEmoji(this)">📈</button>
+      <button class="list-emoji-btn" data-emoji="🏋️" onclick="selectListEmoji(this)">🏋️</button>
+      <button class="list-emoji-btn" data-emoji="✈️" onclick="selectListEmoji(this)">✈️</button>
+      <button class="list-emoji-btn" data-emoji="🎵" onclick="selectListEmoji(this)">🎵</button>
+    </div>
+
+    <!-- Nome -->
+    <input type="text" id="list-modal-name" placeholder="Nome da lista…" style="width:100%;margin-top:12px"
+           maxlength="40" onkeydown="if(event.key==='Enter')saveList()">
+
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeListModal()">Cancelar</button>
+      <button class="btn-add" onclick="saveList()" id="list-modal-save-btn">
+        <div class="spinner"></div>
+        <span class="btn-label">Salvar</span>
       </button>
     </div>
   </div>

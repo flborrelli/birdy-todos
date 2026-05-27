@@ -415,3 +415,149 @@ input[type=number]:focus { outline: none; border-color: var(--text2); }
   .pay-item-amount  { font-size: 15px; }
   .btn-pay-secondary { font-size: 15px; }
 }
+
+/* ─────────────────────────────────────────
+   Listas — Sidebar nav
+   ───────────────────────────────────────── */
+
+.lists-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lists-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 4px;
+}
+
+.lists-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text3);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-new-list {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text3);
+  padding: 2px 4px;
+  border-radius: 6px;
+  font-size: 15px;
+  line-height: 1;
+  transition: color .15s, background .15s;
+}
+.btn-new-list:hover { color: var(--text); background: var(--bg3); }
+
+/* Cada item de lista na sidebar */
+.list-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  transition: background .15s;
+  position: relative;
+}
+.list-nav-item:hover  { background: var(--bg3); }
+.list-nav-item.active { background: var(--bg3); font-weight: 600; }
+
+.list-nav-emoji { font-size: 16px; flex: none; line-height: 1; }
+.list-nav-name  { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-nav-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  background: var(--bg3);
+  border-radius: 99px;
+  padding: 1px 7px;
+  flex: none;
+}
+.list-nav-item.active .list-nav-count { background: var(--bg); }
+
+/* Ações visíveis no hover */
+.list-nav-actions {
+  display: none;
+  gap: 2px;
+  flex: none;
+}
+.list-nav-item:hover .list-nav-actions { display: flex; }
+.list-nav-item:hover .list-nav-count   { display: none; }
+
+.list-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text3);
+  padding: 2px 4px;
+  border-radius: 5px;
+  font-size: 13px;
+  line-height: 1;
+  transition: color .15s, background .15s;
+}
+.list-action-btn:hover { color: var(--text); background: var(--border); }
+.list-action-btn.danger:hover { color: var(--red); background: rgba(226,75,74,.1); }
+
+/* Badge da lista nos cards de tarefa */
+.list-badge-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text2);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 1px 8px;
+  margin-top: 4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─────────────────────────────────────────
+   Modal de lista (criar / editar)
+   ───────────────────────────────────────── */
+
+.list-modal { max-width: 360px; }
+
+.list-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.list-emoji-btn {
+  background: var(--bg2);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 6px 4px;
+  text-align: center;
+  transition: background .12s, border-color .12s, transform .1s;
+}
+.list-emoji-btn:hover  { background: var(--bg3); transform: scale(1.1); }
+.list-emoji-btn.sel {
+  border-color: var(--prazo-sel);
+  background: var(--prazo-bg);
+}

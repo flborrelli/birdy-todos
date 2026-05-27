@@ -1,7 +1,7 @@
 import { initializeApp }       from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
                                from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, increment }
+import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, increment, writeBatch, getDocs }
                                from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
 
 // ── Config ────────────────────────────────────────────────────
@@ -43,6 +43,7 @@ let calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
 let unsubTasks = null;
 let searchQuery = '';
 let detailTaskId = null, unsubNotes = null, selectedNoteColor = '#FEF08A';
+let lists = [], activeListId = null, unsubLists = null, editListId = null;
 
 const NOTE_COLORS = ['#FEF08A', '#93C5FD', '#F9A8D4', '#86EFAC', '#FCD34D', '#C4B5FD'];
 
@@ -57,13 +58,15 @@ onAuthStateChanged(auth, user => {
     document.getElementById('user-avatar').style.display = user.photoURL ? '' : 'none';
     startListening(user.uid);
     startListeningPayments(user.uid);
+    startListeningLists(user.uid);
   } else {
     document.getElementById('login-screen').classList.remove('hidden');
     document.getElementById('main-app').style.display = 'none';
     document.getElementById('fab').style.display = 'none';
-    if (unsubTasks) { unsubTasks(); unsubTasks = null; }
+    if (unsubTasks)    { unsubTasks();    unsubTasks    = null; }
     if (unsubPayments) { unsubPayments(); unsubPayments = null; }
-    tasks = []; payments = [];
+    if (unsubLists)    { unsubLists();    unsubLists    = null; }
+    tasks = []; payments = []; lists = []; activeListId = null;
   }
 });
 
@@ -95,6 +98,37 @@ function startListening(uid) {
       setSyncStatus('err', 'Erro de conexão');
     }
   );
+}
+
+function getListCol() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return null;
+  return collection(db, 'users', uid, 'lists');
+}
+
+function startListeningLists(uid) {
+  if (unsubLists) unsubLists();
+  const COL = collection(db, 'users', uid, 'lists');
+  unsubLists = onSnapshot(COL, async snap => {
+    lists = snap.docs.map(d => ({ ...d.data(), _id: d.id }))
+      .sort((a, b) => (a.order || 0) - (b.order || 0) || (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+    // Primeira vez sem listas: criar "Trabalho" e migrar tarefas existentes
+    if (lists.length === 0) {
+      const ref = await addDoc(COL, { name: 'Trabalho', emoji: '💼', createdAt: serverTimestamp(), order: 0 });
+      await migrateTasksToList(uid, ref.id);
+    }
+    renderLists();
+  });
+}
+
+async function migrateTasksToList(uid, listId) {
+  const taskCol  = collection(db, 'users', uid, 'tasks');
+  const snap     = await getDocs(taskCol);
+  const toUpdate = snap.docs.filter(d => !d.data().listId);
+  if (!toUpdate.length) return;
+  const batch = writeBatch(db);
+  toUpdate.forEach(d => batch.update(d.ref, { listId }));
+  await batch.commit();
 }
 
 function getUserCol() {
@@ -161,6 +195,10 @@ window.openModal = function (id) {
   document.getElementById('m-processo').value = t ? (t.processo || '') : '';
   document.getElementById('m-autor').value    = t ? (t.autor || '') : '';
   document.getElementById('m-reu').value      = t ? (t.reu || '') : '';
+  // Popular seletor de lista
+  const mList = document.getElementById('m-list');
+  mList.innerHTML = '<option value="">— Sem lista —</option>' +
+    lists.map(l => `<option value="${l._id}"${(t ? t.listId : activeListId) === l._id ? ' selected' : ''}>${l.emoji} ${esc(l.name)}</option>`).join('');
   togglePrazoFields();
   document.getElementById('modal-overlay').classList.add('open');
   setTimeout(() => document.getElementById('m-title').focus(), 100);
@@ -191,6 +229,7 @@ window.saveModal = async function () {
     processo: cat === 'prazo' ? document.getElementById('m-processo').value.trim() : '',
     autor:    cat === 'prazo' ? document.getElementById('m-autor').value.trim() : '',
     reu:      cat === 'prazo' ? document.getElementById('m-reu').value.trim() : '',
+    listId:   document.getElementById('m-list').value || null,
   };
   try {
     if (editId) {
@@ -231,7 +270,9 @@ window.setFilter = function (cat) { filterCat = cat; render(); };
 window.setView = function (v) {
   view = v;
   filterCat = 'all';
+  activeListId = null;
   ['pending', 'today', 'done', 'calendar', 'payments'].forEach(x => document.getElementById('tab-' + x).classList.toggle('active', x === v));
+  document.querySelectorAll('.list-nav-item').forEach(x => x.classList.remove('active'));
   const hideToolbar = v === 'calendar' || v === 'payments';
   document.querySelector('.search-wrap').style.display = hideToolbar ? 'none' : '';
   document.getElementById('filters').style.display     = hideToolbar ? 'none' : '';
@@ -249,6 +290,7 @@ window.fabAction = function () {
 // ── Render ────────────────────────────────────────────────────
 function getVisible() {
   let list = tasks.filter(t => {
+    if (activeListId) return t.listId === activeListId && !t.done;
     if (view === 'pending') return !t.done;
     if (view === 'done') return t.done;
     const s = dateStatus(t.date);
@@ -305,7 +347,7 @@ function taskHtml(t) {
       `<div class="task-title">${esc(t.title)}</div>` +
       (t.cat === 'prazo' && t.processo ? `<div class="task-processo"><i class="ti ti-file-text" style="font-size:11px;flex-shrink:0"></i><strong>${esc(t.processo)}</strong></div>` : '') +
       (t.cat === 'prazo' && (t.autor || t.reu) ? `<div class="task-partes">${esc(t.autor || '—')} <span style="color:var(--text3);font-weight:400">×</span> ${esc(t.reu || '—')}</div>` : '') +
-      `<div class="task-meta" style="margin-top:${t.cat === 'prazo' && (t.processo || t.autor) ? '5px' : '4px'}"><span class="chip ${CATS[t.cat]?.cls || 'outro'}" style="font-size:11px;padding:2px 7px">${CATS[t.cat]?.icon || ''} ${CATS[t.cat]?.label || t.cat}</span>${dt}</div>` +
+      `<div class="task-meta" style="margin-top:${t.cat === 'prazo' && (t.processo || t.autor) ? '5px' : '4px'}"><span class="chip ${CATS[t.cat]?.cls || 'outro'}" style="font-size:11px;padding:2px 7px">${CATS[t.cat]?.icon || ''} ${CATS[t.cat]?.label || t.cat}</span>${dt}${(() => { const l = lists.find(x => x._id === t.listId); return (!activeListId && l) ? `<span class="list-badge-card">${l.emoji} ${esc(l.name)}</span>` : ''; })()}</div>` +
       (t.note ? `<div class="task-note">${esc(t.note)}</div>` : '') +
       postits +
     `</div>` +
@@ -347,11 +389,105 @@ function renderList() {
   el.innerHTML = html;
 }
 
+function renderLists() {
+  const el = document.getElementById('lists-nav');
+  if (!el) return;
+  if (!lists.length) { el.innerHTML = ''; return; }
+  el.innerHTML = lists.map(l => {
+    const count = tasks.filter(t => t.listId === l._id && !t.done).length;
+    return `<div class="list-nav-item${activeListId === l._id ? ' active' : ''}" onclick="setList('${l._id}')">
+      <span class="list-nav-emoji">${l.emoji}</span>
+      <span class="list-nav-name">${esc(l.name)}</span>
+      <span class="list-nav-actions">
+        <button class="list-action-btn" onclick="event.stopPropagation();openListModal('${l._id}')" title="Renomear lista"><i class="ti ti-pencil"></i></button>
+        <button class="list-action-btn danger" onclick="event.stopPropagation();deleteList('${l._id}')" title="Excluir lista"><i class="ti ti-trash"></i></button>
+      </span>
+      ${count > 0 ? `<span class="list-nav-count">${count}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+window.setList = function (id) {
+  activeListId = id;
+  filterCat = 'all';
+  // Desativa tabs e ativa item de lista
+  ['pending', 'today', 'done', 'calendar', 'payments'].forEach(x => {
+    const el = document.getElementById('tab-' + x);
+    if (el) el.classList.remove('active');
+  });
+  document.querySelectorAll('.list-nav-item').forEach(x => x.classList.toggle('active', x.getAttribute('onclick') === `setList('${id}')`));
+  const hideToolbar = false;
+  document.querySelector('.search-wrap').style.display = '';
+  document.getElementById('filters').style.display     = '';
+  document.querySelector('.sort-row').style.display    = '';
+  render();
+};
+
+// ── CRUD de Listas ────────────────────────────────────────────
+window.openListModal = function (id) {
+  editListId = id || null;
+  const l = id ? lists.find(x => x._id === id) : null;
+  document.getElementById('list-modal-title').textContent = id ? 'Editar lista' : 'Nova lista';
+  document.getElementById('list-modal-name').value = l ? l.name : '';
+  // Selecionar emoji atual
+  const currentEmoji = l ? l.emoji : '💼';
+  document.querySelectorAll('.list-emoji-btn').forEach(b => {
+    b.classList.toggle('sel', b.dataset.emoji === currentEmoji);
+  });
+  document.getElementById('list-modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('list-modal-name').focus(), 100);
+};
+
+window.closeListModal = function () {
+  document.getElementById('list-modal-overlay').classList.remove('open');
+  editListId = null;
+};
+
+window.saveList = async function () {
+  const name = document.getElementById('list-modal-name').value.trim();
+  if (!name) { document.getElementById('list-modal-name').focus(); return; }
+  const emojiSel = document.querySelector('.list-emoji-btn.sel');
+  const emoji = emojiSel ? emojiSel.dataset.emoji : '💼';
+  const COL = getListCol(); if (!COL) return;
+  try {
+    if (editListId) {
+      await updateDoc(doc(db, 'users', auth.currentUser.uid, 'lists', editListId), { name, emoji });
+      showToast('Lista atualizada');
+    } else {
+      await addDoc(COL, { name, emoji, createdAt: serverTimestamp(), order: lists.length });
+      showToast('Lista criada');
+    }
+    closeListModal();
+  } catch (e) { console.error(e); showToast('Erro ao salvar lista.'); }
+};
+
+window.deleteList = async function (id) {
+  const l = lists.find(x => x._id === id);
+  if (!confirm(`Excluir a lista "${l?.name}"?\nAs tarefas ficarão sem lista associada.`)) return;
+  try {
+    // Remover listId das tarefas desta lista
+    const uid = auth.currentUser?.uid; if (!uid) return;
+    const snap = await getDocs(collection(db, 'users', uid, 'tasks'));
+    const batch = writeBatch(db);
+    snap.docs.filter(d => d.data().listId === id).forEach(d => batch.update(d.ref, { listId: null }));
+    batch.delete(doc(db, 'users', uid, 'lists', id));
+    await batch.commit();
+    if (activeListId === id) { activeListId = null; setView('pending'); }
+    showToast('Lista excluída');
+  } catch (e) { console.error(e); showToast('Erro ao excluir lista.'); }
+};
+
+window.selectListEmoji = function (btn) {
+  document.querySelectorAll('.list-emoji-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+};
+
 window.render = function () {
   renderStats();
-  if (view === 'payments')      { renderPayments(); }
-  else if (view === 'calendar') { renderCalendar(); }
-  else                          { renderFilters(); renderList(); }
+  renderLists();
+  if (view === 'payments')             { renderPayments(); }
+  else if (view === 'calendar' && !activeListId) { renderCalendar(); }
+  else                                 { renderFilters(); renderList(); }
 };
 
 // ── Calendário ────────────────────────────────────────────────
