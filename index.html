@@ -117,11 +117,11 @@
     <div class="stats" id="stats"></div>
     <div class="sidebar-divider"></div>
     <div class="tabs">
-      <button class="tab active" onclick="setView('pending')" id="tab-pending"><i class="ti ti-clock" aria-hidden="true"></i><span>Pendentes</span></button>
-      <button class="tab" onclick="setView('today')" id="tab-today"><i class="ti ti-alert-triangle" aria-hidden="true"></i><span>Urgentes</span></button>
-      <button class="tab" onclick="setView('done')" id="tab-done"><i class="ti ti-check" aria-hidden="true"></i><span>Concluídas</span></button>
-      <button class="tab" onclick="setView('calendar')" id="tab-calendar"><i class="ti ti-calendar-month" aria-hidden="true"></i><span>Calendário</span></button>
-      <button class="tab" onclick="setView('payments')" id="tab-payments"><i class="ti ti-receipt" aria-hidden="true"></i><span>Pagamentos</span></button>
+      <button class="tab active" onclick="setView('pending')" id="tab-pending"><span class="tab-emoji">🕐</span><span>Pendentes</span></button>
+      <button class="tab" onclick="setView('today')" id="tab-today"><span class="tab-emoji">⚠️</span><span>Urgentes</span></button>
+      <button class="tab" onclick="setView('done')" id="tab-done"><span class="tab-emoji">✅</span><span>Concluídas</span></button>
+      <button class="tab" onclick="setView('calendar')" id="tab-calendar"><span class="tab-emoji">📅</span><span>Calendário</span></button>
+      <button class="tab" onclick="setView('payments')" id="tab-payments"><span class="tab-emoji">💳</span><span>Pagamentos</span></button>
     </div>
     <div class="sidebar-divider" style="display:block;margin:.75rem 0 .5rem"></div>
     <div class="lists-section">
@@ -137,6 +137,8 @@
       <div class="sync-dot syncing" id="sync-dot"></div>
       <span id="sync-label">Conectando…</span>
     </div>
+    <!-- Cabeçalho da lista ativa (só aparece ao clicar numa lista) -->
+    <div id="list-view-header" style="display:none"></div>
     <div class="search-wrap">
       <i class="ti ti-search search-icon" aria-hidden="true"></i>
       <input type="text" class="search-input" id="search-input" placeholder="Buscar tarefas…" oninput="setSearch(this.value)" autocomplete="off">
@@ -218,6 +220,8 @@
     </div>
     <div class="detail-meta" id="detail-meta"></div>
     <div class="detail-note-text" id="detail-note-text"></div>
+    <!-- Subtarefas -->
+    <div id="detail-subtasks"></div>
     <div class="detail-notes-header">
       <span class="section-label" style="margin:0">Post-its</span>
       <button class="btn-add-note" onclick="toggleNoteForm()"><i class="ti ti-plus"></i> Novo</button>

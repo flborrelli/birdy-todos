@@ -280,6 +280,9 @@ window.setView = function (v) {
   document.querySelector('.sort-row').style.display    = hideToolbar ? 'none' : '';
   const fab = document.getElementById('fab');
   fab.setAttribute('aria-label', v === 'payments' ? 'Novo pagamento' : 'Nova tarefa');
+  // Esconde cabeçalho de lista
+  const lvh = document.getElementById('list-view-header');
+  if (lvh) lvh.style.display = 'none';
   render();
 };
 
@@ -341,6 +344,13 @@ function taskHtml(t) {
   const postits = nc > 0
     ? `<div class="card-postits"><i class="ti ti-note card-postit-icon"></i><span class="card-postit-text">${esc(t.notePreview || '')}</span>${nc > 1 ? `<span class="card-postit-count">+${nc - 1}</span>` : ''}</div>`
     : '';
+  // Barra de progresso de subtarefas
+  const subs = t.subtasks || [];
+  const subDone = subs.filter(s => s.done).length;
+  const subTotal = subs.length;
+  const subBar = subTotal > 0
+    ? `<div class="card-subtask-bar"><div class="card-subtask-track"><div class="card-subtask-fill" style="width:${Math.round(subDone / subTotal * 100)}%"></div></div><span class="card-subtask-label">${subDone}/${subTotal}</span></div>`
+    : '';
   return `<div class="task-card${t.done ? ' done' : ''}">` +
     `<div class="prio-bar" style="background:${t.done ? 'var(--border)' : pc.color}"></div>` +
     `<div class="cb${t.done ? ' checked' : ''}" onclick="toggleDone('${t._id}')" role="checkbox" aria-checked="${t.done}" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter')toggleDone('${t._id}')">${t.done ? '<i class="ti ti-check" style="font-size:11px;color:var(--bg)"></i>' : ''}</div>` +
@@ -351,6 +361,7 @@ function taskHtml(t) {
       `<div class="task-meta" style="margin-top:${t.cat === 'prazo' && (t.processo || t.autor) ? '5px' : '4px'}"><span class="chip ${CATS[t.cat]?.cls || 'outro'}" style="font-size:11px;padding:2px 7px">${CATS[t.cat]?.icon || ''} ${CATS[t.cat]?.label || t.cat}</span>${dt}${(() => { const l = lists.find(x => x._id === t.listId); return (!activeListId && l) ? `<span class="list-badge-card">${l.emoji} ${esc(l.name)}</span>` : ''; })()}</div>` +
       (t.note ? `<div class="task-note">${esc(t.note)}</div>` : '') +
       postits +
+      subBar +
     `</div>` +
     `<div class="task-actions">` +
       `<button class="icon-btn" onclick="openModal('${t._id}')" aria-label="Editar"><i class="ti ti-edit"></i></button>` +
@@ -417,10 +428,16 @@ window.setList = function (id) {
     if (el) el.classList.remove('active');
   });
   document.querySelectorAll('.list-nav-item').forEach(x => x.classList.toggle('active', x.getAttribute('onclick') === `setList('${id}')`));
-  const hideToolbar = false;
   document.querySelector('.search-wrap').style.display = '';
   document.getElementById('filters').style.display     = '';
   document.querySelector('.sort-row').style.display    = '';
+  // Exibe cabeçalho com nome e emoji da lista
+  const lvh = document.getElementById('list-view-header');
+  const l = lists.find(x => x._id === id);
+  if (lvh && l) {
+    lvh.innerHTML = `<span class="list-header-emoji">${l.emoji}</span><span class="list-header-name">${esc(l.name)}</span>`;
+    lvh.style.display = 'flex';
+  }
   render();
 };
 
@@ -489,6 +506,8 @@ window.render = function () {
   if (view === 'payments')             { renderPayments(); }
   else if (view === 'calendar' && !activeListId) { renderCalendar(); }
   else                                 { renderFilters(); renderList(); }
+  // Atualiza subtarefas no painel de detalhe se estiver aberto
+  if (detailTaskId) renderSubtasks(detailTaskId);
 };
 
 // ── Calendário ────────────────────────────────────────────────
@@ -613,6 +632,7 @@ window.openDetail = function (id) {
   document.getElementById('note-text-input').value = '';
   initNoteColors();
 
+  renderSubtasks(id);
   document.getElementById('detail-overlay').classList.add('open');
   document.getElementById('main-app').classList.add('detail-open');
   startListeningNotes(id);
@@ -627,6 +647,71 @@ window.closeDetail = function () {
 
 window.handleDetailOverlayClick = function (e) {
   if (e.target.id === 'detail-overlay') closeDetail();
+};
+
+// ── Subtarefas ────────────────────────────────────────────────
+function renderSubtasks(taskId) {
+  const el = document.getElementById('detail-subtasks');
+  if (!el) return;
+  const t = tasks.find(x => x._id === taskId);
+  if (!t) { el.innerHTML = ''; return; }
+  const subs = t.subtasks || [];
+  const done = subs.filter(s => s.done).length;
+  const total = subs.length;
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+  el.innerHTML =
+    `<div class="subtask-header">` +
+      `<span class="section-label" style="margin:0">Subtarefas</span>` +
+      (total > 0 ? `<span class="subtask-count">${done}/${total}</span>` : '') +
+    `</div>` +
+    (total > 0 ? `<div class="subtask-progress"><div class="subtask-progress-fill" style="width:${pct}%"></div></div>` : '') +
+    subs.map(s =>
+      `<div class="subtask-item">` +
+        `<button class="subtask-cb${s.done ? ' done' : ''}" onclick="toggleSubtask('${taskId}','${s.id}')" aria-label="Toggle subtarefa">` +
+          (s.done ? `<i class="ti ti-check" style="font-size:10px"></i>` : '') +
+        `</button>` +
+        `<span class="subtask-text${s.done ? ' done' : ''}">${esc(s.text)}</span>` +
+        `<button class="subtask-del" onclick="deleteSubtask('${taskId}','${s.id}')" aria-label="Excluir subtarefa"><i class="ti ti-x" style="font-size:11px"></i></button>` +
+      `</div>`
+    ).join('') +
+    `<div class="subtask-add">` +
+      `<input type="text" id="subtask-input" class="subtask-add-input" placeholder="+ Adicionar subtarefa…" maxlength="120"` +
+        ` onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask('${taskId}');}">` +
+      `<button class="icon-btn" onclick="addSubtask('${taskId}')" aria-label="Adicionar"><i class="ti ti-plus" style="font-size:14px"></i></button>` +
+    `</div>`;
+}
+
+window.toggleSubtask = async function (taskId, subtaskId) {
+  const t = tasks.find(x => x._id === taskId);
+  if (!t) return;
+  const subtasks = (t.subtasks || []).map(s => s.id === subtaskId ? { ...s, done: !s.done } : s);
+  try {
+    await updateDoc(doc(db, 'users', auth.currentUser.uid, 'tasks', taskId), { subtasks });
+  } catch (e) { console.error(e); showToast('Erro ao atualizar subtarefa.'); }
+};
+
+window.addSubtask = async function (taskId) {
+  const input = document.getElementById('subtask-input');
+  const text = input?.value.trim();
+  if (!text) { input?.focus(); return; }
+  const t = tasks.find(x => x._id === taskId);
+  if (!t) return;
+  const subtasks = [...(t.subtasks || []), { id: crypto.randomUUID(), text, done: false }];
+  try {
+    await updateDoc(doc(db, 'users', auth.currentUser.uid, 'tasks', taskId), { subtasks });
+    if (input) input.value = '';
+    input?.focus();
+  } catch (e) { console.error(e); showToast('Erro ao adicionar subtarefa.'); }
+};
+
+window.deleteSubtask = async function (taskId, subtaskId) {
+  if (!confirm('Excluir esta subtarefa?')) return;
+  const t = tasks.find(x => x._id === taskId);
+  if (!t) return;
+  const subtasks = (t.subtasks || []).filter(s => s.id !== subtaskId);
+  try {
+    await updateDoc(doc(db, 'users', auth.currentUser.uid, 'tasks', taskId), { subtasks });
+  } catch (e) { console.error(e); showToast('Erro ao excluir subtarefa.'); }
 };
 
 // ── Post-its ──────────────────────────────────────────────────

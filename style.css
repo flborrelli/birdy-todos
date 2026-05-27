@@ -563,6 +563,164 @@ input[type=number]:focus { outline: none; border-color: var(--text2); }
 }
 
 /* ─────────────────────────────────────────
+   Emoji nas tabs de navegação
+   ───────────────────────────────────────── */
+.tab-emoji { font-size: 14px; line-height: 1; flex-shrink: 0; }
+@media (min-width: 860px) { .tab-emoji { font-size: 16px; } }
+
+/* ─────────────────────────────────────────
+   Cabeçalho da lista ativa
+   ───────────────────────────────────────── */
+#list-view-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+.list-header-emoji { font-size: 22px; line-height: 1; }
+.list-header-name  { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
+
+/* ─────────────────────────────────────────
+   Barra de subtarefas no card de tarefa
+   ───────────────────────────────────────── */
+.card-subtask-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  width: 100%;
+}
+.card-subtask-track {
+  flex: 1;
+  height: 4px;
+  background: var(--bg3);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.card-subtask-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 99px;
+  transition: width .3s ease;
+}
+.card-subtask-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  flex-shrink: 0;
+}
+
+/* ─────────────────────────────────────────
+   Subtarefas no painel de detalhe
+   ───────────────────────────────────────── */
+#detail-subtasks {
+  margin: 12px 0 4px;
+}
+
+.subtask-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.subtask-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  background: var(--bg3);
+  border-radius: 99px;
+  padding: 1px 8px;
+}
+
+.subtask-progress {
+  height: 4px;
+  background: var(--bg3);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.subtask-progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 99px;
+  transition: width .3s ease;
+}
+
+.subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.subtask-item:last-of-type { border-bottom: none; }
+
+.subtask-cb {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border2);
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background .12s, border-color .12s;
+  color: var(--bg);
+}
+.subtask-cb.done { background: var(--green); border-color: var(--green); }
+.subtask-cb:hover { border-color: var(--green); }
+
+.subtask-text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.35;
+}
+.subtask-text.done {
+  text-decoration: line-through;
+  color: var(--text3);
+}
+
+.subtask-del {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text3);
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity .15s, color .15s;
+  flex-shrink: 0;
+}
+.subtask-item:hover .subtask-del { opacity: 1; }
+.subtask-del:hover { color: var(--red); }
+
+.subtask-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+.subtask-add-input {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  outline: none;
+  padding: 4px 2px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: var(--font);
+  transition: border-color .15s;
+}
+.subtask-add-input:focus { border-color: var(--prazo-sel); }
+.subtask-add-input::placeholder { color: var(--text3); }
+
+/* ─────────────────────────────────────────
    Painel de detalhe lateral (desktop ≥860px)
    No mobile continua como modal overlay
    ───────────────────────────────────────── */
