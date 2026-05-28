@@ -112,12 +112,6 @@ function startListeningLists(uid) {
   unsubLists = onSnapshot(COL, async snap => {
     lists = snap.docs.map(d => ({ ...d.data(), _id: d.id }))
       .sort((a, b) => (a.order || 0) - (b.order || 0) || (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
-    // Primeira vez sem listas: criar "TRABALHO" e migrar tarefas existentes
-    if (lists.length === 0) {
-      const ref = await addDoc(COL, { name: 'TRABALHO', emoji: '💼', createdAt: serverTimestamp(), order: 0 });
-      await migrateTasksToList(uid, ref.id);
-      return; // onSnapshot vai disparar novamente com a lista criada
-    }
     renderLists();
   });
 }
