@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "birdy-mockup",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "4321", "."],
+      "port": 4321,
+      "url": "http://localhost:4321/mockup-v2.html"
+    },
+    {
+      "name": "birdy-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 4322
+    }
+  ]
+}

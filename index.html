@@ -6,23 +6,21 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Birdy · Tarefas</title>
-  <meta name="description" content="Gerencie prazos judiciais, contratos e tarefas do escritório com agilidade.">
-  <!-- Open Graph / WhatsApp / Telegram -->
+  <meta name="description" content="Anote. Organize. Voe mais leve.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://birdy-tarefas.web.app/">
   <meta property="og:title" content="Birdy · Tarefas">
-  <meta property="og:description" content="Gerencie prazos judiciais, contratos e tarefas do escritório com agilidade.">
+  <meta property="og:description" content="Anote. Organize. Voe mais leve.">
   <meta property="og:image" content="https://birdy-tarefas.web.app/brand/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Birdy · Tarefas">
-  <meta name="twitter:description" content="Gerencie prazos judiciais, contratos e tarefas do escritório com agilidade.">
+  <meta name="twitter:description" content="Anote. Organize. Voe mais leve.">
   <meta name="twitter:image" content="https://birdy-tarefas.web.app/brand/og-image.png">
   <link rel="icon" type="image/svg+xml" href="brand/birdy-icon-64.svg">
-  <link rel="stylesheet" href="brand/birdy-tokens.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/brand/birdy-tokens.css">
+  <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
   <script>(function(){var t=localStorage.getItem('birdy-theme');if(t&&t!=='auto')document.documentElement.setAttribute('data-theme',t)})();</script>
 </head>
@@ -112,15 +110,10 @@
         <button class="btn-logout" onclick="doLogout()">Sair</button>
       </div>
     </div>
-    <button class="btn-new sidebar-new" onclick="openModal()"><i class="ti ti-plus" aria-hidden="true"></i>Nova tarefa</button>
-    <div class="sidebar-divider"></div>
     <div class="stats" id="stats"></div>
     <div class="sidebar-divider"></div>
     <div class="tabs">
-      <button class="tab active" onclick="setView('pending')" id="tab-pending"><span class="tab-emoji">🕐</span><span>Pendentes</span></button>
-      <button class="tab" onclick="setView('today')" id="tab-today"><span class="tab-emoji">⚠️</span><span>Urgentes</span></button>
-      <button class="tab" onclick="setView('done')" id="tab-done"><span class="tab-emoji">✅</span><span>Concluídas</span></button>
-      <button class="tab" onclick="setView('calendar')" id="tab-calendar"><span class="tab-emoji">📅</span><span>Calendário</span></button>
+      <button class="tab active" onclick="setView('pending')" id="tab-pending"><span class="tab-emoji">📝</span><span>Pendentes</span></button>
       <button class="tab" onclick="setView('payments')" id="tab-payments"><span class="tab-emoji">💳</span><span>Pagamentos</span></button>
     </div>
     <div class="sidebar-divider" style="display:block;margin:.75rem 0 .5rem"></div>
@@ -132,72 +125,56 @@
       <div id="lists-nav"></div>
     </div>
   </aside>
-  <div class="content">
+
+  <main class="content">
     <div class="sync-bar">
       <div class="sync-dot syncing" id="sync-dot"></div>
       <span id="sync-label">Conectando…</span>
     </div>
-    <!-- Cabeçalho da lista ativa (só aparece ao clicar numa lista) -->
     <div id="list-view-header" style="display:none"></div>
-    <div class="search-wrap">
-      <i class="ti ti-search search-icon" aria-hidden="true"></i>
-      <input type="text" class="search-input" id="search-input" placeholder="Buscar tarefas…" oninput="setSearch(this.value)" autocomplete="off">
-      <button class="search-clear" id="search-clear" onclick="clearSearch()" aria-label="Limpar busca" style="display:none"><i class="ti ti-x"></i></button>
+
+    <!-- Quick-add (oculto na view de pagamentos) -->
+    <div id="quick-add" class="quick-add">
+      <div class="qa-row" id="qa-row">
+        <span class="qa-placeholder" aria-hidden="true"></span>
+        <input class="qa-input" id="qa-input" type="text"
+               placeholder="Adicionar pendência…" autocomplete="off" autocorrect="off">
+        <button class="qa-expand-btn" id="qa-expand-btn"
+                onclick="toggleQaNoteRow()" title="Adicionar detalhes (Tab)" aria-label="Adicionar detalhes">
+          <i class="ti ti-dots"></i>
+        </button>
+      </div>
+      <div class="qa-note-row" id="qa-note-row">
+        <textarea class="qa-note" id="qa-note" placeholder="Detalhes (opcional)…" rows="2"></textarea>
+        <div class="qa-note-actions">
+          <button class="btn-cancel" onclick="closeQaNote()">Cancelar</button>
+          <button class="btn-add small" onclick="quickAdd()">
+            <span class="btn-label">Adicionar</span>
+          </button>
+        </div>
+      </div>
     </div>
-    <div class="filters" id="filters"></div>
-    <div class="sort-row">
-      <span class="sort-label"><i class="ti ti-arrows-sort" aria-hidden="true" style="font-size:13px"></i>Ordenar por</span>
-      <select onchange="sortBy=this.value;render()">
-        <option value="prio">Prioridade</option>
-        <option value="date">Data</option>
-        <option value="cat">Categoria</option>
-        <option value="added">Mais recentes</option>
-      </select>
-    </div>
+
     <div id="list"></div>
-  </div>
+  </main>
 </div>
 
-<button class="fab" onclick="fabAction()" aria-label="Nova tarefa" id="fab">
+<!-- FAB (mobile) -->
+<button class="fab" onclick="fabAction()" aria-label="Nova pendência" id="fab" style="display:none">
   <i class="ti ti-plus" aria-hidden="true"></i>
 </button>
 
+<!-- Modal: pendência -->
 <div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)" role="dialog" aria-modal="true">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title-text" id="modal-title-el">Nova tarefa</span>
+      <span class="modal-title-text" id="modal-title-el">Nova pendência</span>
       <button class="icon-btn" onclick="closeModal()" aria-label="Fechar"><i class="ti ti-x"></i></button>
     </div>
-    <input type="text" id="m-title" placeholder="Descrição da tarefa…" style="width:100%;margin-bottom:8px" onkeydown="if(event.key==='Enter')saveModal()">
-    <select id="m-list" style="width:100%;margin-bottom:8px"></select>
-    <div class="mfr">
-      <select id="m-cat" onchange="togglePrazoFields()">
-        <option value="prazo">⚖️ Prazo judicial</option>
-        <option value="contrato">📄 Contrato</option>
-        <option value="cartorio">🏛️ Cartório</option>
-        <option value="societario">🏢 Societário</option>
-        <option value="ato">📋 Ato Societário</option>
-        <option value="procuracao">✍️ Procuração</option>
-        <option value="email">✉️ E-mail</option>
-        <option value="reuniao">🤝 Reunião</option>
-        <option value="outro">📌 Outro</option>
-      </select>
-      <select id="m-prio">
-        <option value="alta">🔴 Alta</option>
-        <option value="media">🟡 Média</option>
-        <option value="baixa">⚪ Baixa</option>
-      </select>
-      <input type="date" id="m-date">
-    </div>
-    <div class="prazo-fields" id="prazo-fields" style="display:none">
-      <div class="prazo-fields-label"><i class="ti ti-scale" style="font-size:12px"></i>Dados do processo <span style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.65;margin-left:3px">(opcional)</span></div>
-      <input type="text" id="m-processo" placeholder="Nº do processo (ex: 1023456-78.2024.8.26.0100)">
-      <div class="prazo-row">
-        <input type="text" id="m-autor" placeholder="Autor">
-        <input type="text" id="m-reu" placeholder="Réu">
-      </div>
-    </div>
-    <textarea id="m-note" placeholder="Observações…"></textarea>
+    <input type="text" id="m-title" placeholder="O que precisa fazer?"
+           onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('m-note').focus();}">
+    <textarea id="m-note" placeholder="Detalhes (opcional)…"></textarea>
+    <select id="m-list" style="display:none;margin-top:8px"></select>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
       <button class="btn-add" onclick="saveModal()" id="modal-save-btn">
@@ -208,47 +185,45 @@
   </div>
 </div>
 
-<!-- Modal de detalhes da tarefa -->
-<div class="modal-overlay" id="detail-overlay" onclick="handleDetailOverlayClick(event)" role="dialog" aria-modal="true">
-  <div class="modal detail-modal">
+<!-- Modal: despesa recorrente -->
+<div class="modal-overlay" id="rec-modal-overlay" onclick="if(event.target===this)closeRecurringModal()" role="dialog" aria-modal="true">
+  <div class="modal">
     <div class="modal-header">
-      <span class="modal-title-text" id="detail-title"></span>
-      <div style="display:flex;gap:4px">
-        <button class="icon-btn" id="detail-edit-btn" aria-label="Editar tarefa"><i class="ti ti-edit"></i></button>
-        <button class="icon-btn" onclick="closeDetail()" aria-label="Fechar"><i class="ti ti-x"></i></button>
-      </div>
+      <span class="modal-title-text" id="rec-modal-title">Nova despesa recorrente</span>
+      <button class="icon-btn" onclick="closeRecurringModal()" aria-label="Fechar"><i class="ti ti-x"></i></button>
     </div>
-    <div class="detail-meta" id="detail-meta"></div>
-    <div class="detail-note-text" id="detail-note-text"></div>
-    <!-- Subtarefas -->
-    <div id="detail-subtasks"></div>
-    <div class="detail-notes-header">
-      <span class="section-label" style="margin:0">Post-its</span>
-      <button class="btn-add-note" onclick="toggleNoteForm()"><i class="ti ti-plus"></i> Novo</button>
+    <input type="text" id="rec-name" placeholder="Nome (ex: Aluguel, Internet…)"
+           onkeydown="if(event.key==='Enter')document.getElementById('rec-amount').focus()">
+    <div class="brl-input-wrap" style="margin-top:8px">
+      <span class="brl-prefix">R$</span>
+      <input type="text" id="rec-amount" placeholder="0,00"
+             oninput="maskBRL(this)" inputmode="decimal"
+             onkeydown="if(event.key==='Enter')saveRecurringModal()">
     </div>
-    <div class="note-form" id="note-form" style="display:none">
-      <textarea id="note-text-input" placeholder="Comentário curto…" maxlength="150"></textarea>
-      <div class="note-colors" id="note-colors"></div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
-        <button class="btn-cancel" onclick="toggleNoteForm()">Cancelar</button>
-        <button class="btn-add" onclick="saveNote()"><span class="btn-label">Adicionar</span></button>
-      </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeRecurringModal()">Cancelar</button>
+      <button class="btn-add" onclick="saveRecurringModal()" id="rec-modal-save-btn">
+        <div class="spinner"></div>
+        <span class="btn-label">Salvar</span>
+      </button>
     </div>
-    <div class="postit-board" id="postit-board"></div>
   </div>
 </div>
 
-<!-- Modal de pagamento -->
+<!-- Modal: pagamento avulso -->
 <div class="modal-overlay" id="pay-modal-overlay" onclick="handlePayModalOverlay(event)" role="dialog" aria-modal="true">
   <div class="modal">
     <div class="modal-header">
       <span class="modal-title-text" id="pay-modal-title">Novo pagamento</span>
       <button class="icon-btn" onclick="closePaymentModal()" aria-label="Fechar"><i class="ti ti-x"></i></button>
     </div>
-    <input type="text" id="pm-desc" placeholder="Descrição (ex: Aluguel, Internet…)" style="width:100%;margin-bottom:8px" onkeydown="if(event.key==='Enter')document.getElementById('pm-amount').focus()">
-    <div class="mfr" style="grid-template-columns:1fr 1fr">
-      <input type="number" id="pm-amount" placeholder="Valor (R$)" step="0.01" min="0" onkeydown="if(event.key==='Enter')savePaymentModal()">
-      <input type="date" id="pm-date">
+    <input type="text" id="pm-desc" placeholder="Descrição (ex: Supermercado, Farmácia…)"
+           onkeydown="if(event.key==='Enter')document.getElementById('pm-amount').focus()">
+    <div class="brl-input-wrap" style="margin-top:8px">
+      <span class="brl-prefix">R$</span>
+      <input type="text" id="pm-amount" placeholder="0,00"
+             oninput="maskBRL(this)" inputmode="decimal"
+             onkeydown="if(event.key==='Enter')savePaymentModal()">
     </div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closePaymentModal()">Cancelar</button>
@@ -260,15 +235,13 @@
   </div>
 </div>
 
-<!-- Modal de lista (criar / editar) -->
+<!-- Modal: lista -->
 <div class="modal-overlay" id="list-modal-overlay" onclick="if(event.target===this)closeListModal()" role="dialog" aria-modal="true">
   <div class="modal list-modal">
     <div class="modal-header">
       <span class="modal-title-text" id="list-modal-title">Nova lista</span>
       <button class="icon-btn" onclick="closeListModal()" aria-label="Fechar"><i class="ti ti-x"></i></button>
     </div>
-
-    <!-- Emoji picker -->
     <p style="font-size:.75rem;color:var(--text2);margin:0 0 6px">Escolha um emoji</p>
     <div class="list-emoji-grid" id="list-emoji-grid">
       <button class="list-emoji-btn" data-emoji="📋" onclick="selectListEmoji(this)">📋</button>
@@ -288,11 +261,8 @@
       <button class="list-emoji-btn" data-emoji="✈️" onclick="selectListEmoji(this)">✈️</button>
       <button class="list-emoji-btn" data-emoji="🎵" onclick="selectListEmoji(this)">🎵</button>
     </div>
-
-    <!-- Nome -->
     <input type="text" id="list-modal-name" placeholder="Nome da lista…" style="width:100%;margin-top:12px"
            maxlength="40" onkeydown="if(event.key==='Enter')saveList()">
-
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeListModal()">Cancelar</button>
       <button class="btn-add" onclick="saveList()" id="list-modal-save-btn">
@@ -304,7 +274,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-
-<script type="module" src="app.js"></script>
+<script type="module" src="/src/main.ts"></script>
 </body>
 </html>

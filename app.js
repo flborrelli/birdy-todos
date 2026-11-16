@@ -1,10 +1,9 @@
 import { initializeApp }       from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
                                from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, increment, writeBatch, getDocs }
+import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch, getDocs, query, where }
                                from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
 
-// ── Config ────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey:            "AIzaSyB5dmG3a12WDdE13jzKTfv9C65igNmhveU",
   authDomain:        "birdy-tarefas.web.app",
@@ -14,1014 +13,755 @@ const firebaseConfig = {
   appId:             "1:564307060103:web:45f9c3a0b5ba4d14131f22"
 };
 
-const fbApp    = initializeApp(firebaseConfig);
-const auth     = getAuth(fbApp);
-const db       = getFirestore(fbApp);
-const provider = new GoogleAuthProvider();
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
 
-// ── Estado ────────────────────────────────────────────────────
-const CATS = {
-  prazo:      { label: 'Prazo judicial', icon: '⚖️',  cls: 'prazo' },
-  contrato:   { label: 'Contrato',       icon: '📄',  cls: 'contrato' },
-  cartorio:   { label: 'Cartório',       icon: '🏛️', cls: 'cartorio' },
-  societario: { label: 'Societário',     icon: '🏢',  cls: 'societario' },
-  ato:        { label: 'Ato Societário', icon: '📋',  cls: 'ato' },
-  procuracao: { label: 'Procuração',     icon: '✍️',  cls: 'procuracao' },
-  email:      { label: 'E-mail',         icon: '✉️',  cls: 'email' },
-  reuniao:    { label: 'Reunião',        icon: '🤝',  cls: 'reuniao' },
-  outro:      { label: 'Outro',          icon: '📌',  cls: 'outro' },
+// ─── State ────────────────────────────────────────────────────
+let tasks     = [];
+let lists     = [];
+let recurring = [];
+let payments  = [];
+
+let currentView   = 'pending'; // 'pending' | 'payments' | list id
+let unsubs        = [];
+let payYear       = new Date().getFullYear();
+let payMonth      = new Date().getMonth(); // 0-based
+let recurringEditMode = false;
+let selectedListEmoji = '📋';
+let editingListId     = null;
+let editingPaymentId  = null;
+let editingRecId      = null;
+
+// ─── Helpers ──────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+function userCol(col) {
+  return collection(db, 'users', auth.currentUser.uid, col);
+}
+function userDoc(col, id) {
+  return doc(db, 'users', auth.currentUser.uid, col, id);
+}
+
+function payMonthStr(y, m) {
+  return `${y}-${String(m + 1).padStart(2, '0')}`;
+}
+
+function fmtBRL(n) {
+  if (!n && n !== 0) return '—';
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+window.maskBRL = function(input) {
+  let v = input.value.replace(/\D/g, '');
+  if (!v) { input.value = ''; return; }
+  const n = parseInt(v, 10) / 100;
+  input.value = n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
-const PRIO = {
-  alta:  { color: '#E24B4A' },
-  media: { color: '#BA7517' },
-  baixa: { color: '#B4B2A9' },
-};
-let tasks = [], view = 'pending', filterCat = 'all', sortBy = 'prio', editId = null;
-let payments = [], payYear = new Date().getFullYear(), payMonth = new Date().getMonth();
-let unsubPayments = null, editPaymentId = null;
-let calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
-let unsubTasks = null;
-let searchQuery = '';
-let detailTaskId = null, unsubNotes = null, selectedNoteColor = '#FEF08A';
-let lists = [], activeListId = null, unsubLists = null, editListId = null;
 
-const NOTE_COLORS = ['#FEF08A', '#93C5FD', '#F9A8D4', '#86EFAC', '#FCD34D', '#C4B5FD'];
+function parseBRL(str) {
+  if (!str) return 0;
+  return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+}
 
-// ── Auth ──────────────────────────────────────────────────────
-onAuthStateChanged(auth, user => {
-  if (user) {
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('main-app').style.display = '';
-    document.getElementById('fab').style.display = '';
-    document.getElementById('user-name').textContent = user.displayName || user.email;
-    document.getElementById('user-avatar').src = user.photoURL || '';
-    document.getElementById('user-avatar').style.display = user.photoURL ? '' : 'none';
-    startListening(user.uid);
-    startListeningPayments(user.uid);
-    startListeningLists(user.uid);
-  } else {
-    document.getElementById('login-screen').classList.remove('hidden');
-    document.getElementById('main-app').style.display = 'none';
-    document.getElementById('fab').style.display = 'none';
-    if (unsubTasks)    { unsubTasks();    unsubTasks    = null; }
-    if (unsubPayments) { unsubPayments(); unsubPayments = null; }
-    if (unsubLists)    { unsubLists();    unsubLists    = null; }
-    tasks = []; payments = []; lists = []; activeListId = null;
-  }
-});
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
+let toastTimer = null;
+function showToast(msg, dur = 2200) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function setSyncState(state, label) {
+  const dot = $('sync-dot'), lbl = $('sync-label');
+  dot.className = 'sync-dot ' + state;
+  lbl.textContent = label;
+}
+
+// ─── Auth ──────────────────────────────────────────────────────
 document.getElementById('btn-google-login').addEventListener('click', async () => {
   try {
-    await signInWithPopup(auth, provider);
-  } catch (e) {
-    console.error(e);
-    showToast('Erro ao fazer login. Tente novamente.');
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch(e) {
+    showToast('Erro ao entrar: ' + e.message);
   }
 });
 
-window.doLogout = async function () {
+window.doLogout = async function() {
+  unsubs.forEach(u => u());
+  unsubs = [];
   await signOut(auth);
 };
 
-// ── Firestore ─────────────────────────────────────────────────
-function startListening(uid) {
-  if (unsubTasks) unsubTasks();
-  const COL = collection(db, 'users', uid, 'tasks');
-  unsubTasks = onSnapshot(COL,
-    snap => {
-      tasks = snap.docs.map(d => ({ ...d.data(), _id: d.id, _col: COL }));
-      setSyncStatus('ok', 'Sincronizado');
-      render();
-    },
-    err => {
-      console.error(err);
-      setSyncStatus('err', 'Erro de conexão');
-    }
-  );
+onAuthStateChanged(auth, user => {
+  if (user) {
+    $('login-screen').style.display = 'none';
+    $('main-app').style.display = 'flex';
+    $('fab').style.display = 'flex';
+    $('user-avatar').src  = user.photoURL || '';
+    $('user-name').textContent = user.displayName || user.email || '';
+    updateDateLabel();
+    startListening();
+  } else {
+    $('login-screen').style.display = 'flex';
+    $('main-app').style.display = 'none';
+    $('fab').style.display = 'none';
+    tasks = []; lists = []; recurring = []; payments = [];
+  }
+});
+
+function updateDateLabel() {
+  const d = new Date();
+  $('date-label').textContent = d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-function getListCol() {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return null;
-  return collection(db, 'users', uid, 'lists');
-}
+// ─── Firestore listeners ───────────────────────────────────────
+function startListening() {
+  setSyncState('syncing', 'Conectando…');
 
-function startListeningLists(uid) {
-  if (unsubLists) unsubLists();
-  const COL = collection(db, 'users', uid, 'lists');
-  unsubLists = onSnapshot(COL, async snap => {
-    lists = snap.docs.map(d => ({ ...d.data(), _id: d.id }))
-      .sort((a, b) => (a.order || 0) - (b.order || 0) || (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
-    renderLists();
+  const u1 = onSnapshot(userCol('tasks'), snap => {
+    tasks = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+    autoDeleteOldCompleted();
+    renderAll();
+    setSyncState('ok', 'Sincronizado');
+  }, () => setSyncState('error', 'Erro de conexão'));
+
+  const u2 = onSnapshot(userCol('lists'), snap => {
+    lists = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+    renderAll();
   });
+
+  const u3 = onSnapshot(userCol('recurring'), snap => {
+    recurring = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+    renderAll();
+  });
+
+  const u4 = onSnapshot(userCol('payments'), snap => {
+    payments = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+    renderAll();
+  });
+
+  unsubs = [u1, u2, u3, u4];
 }
 
-async function migrateTasksToList(uid, listId) {
-  const taskCol  = collection(db, 'users', uid, 'tasks');
-  const snap     = await getDocs(taskCol);
-  const toUpdate = snap.docs.filter(d => !d.data().listId);
-  if (!toUpdate.length) return;
+function autoDeleteOldCompleted() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  const toDelete = tasks.filter(t => t.done && t.doneAt && t.doneAt < oneDayAgo);
+  if (!toDelete.length) return;
   const batch = writeBatch(db);
-  toUpdate.forEach(d => batch.update(d.ref, { listId }));
-  await batch.commit();
+  toDelete.forEach(t => batch.delete(userDoc('tasks', t._id)));
+  batch.commit().catch(err => console.error('Auto-delete error:', err));
 }
 
-function getUserCol() {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return null;
-  return collection(db, 'users', uid, 'tasks');
-}
-
-// ── Helpers ───────────────────────────────────────────────────
-function today() { return new Date().toISOString().slice(0, 10); }
-
-function fmtDate(d) {
-  if (!d) return null;
-  const [y, m, dd] = d.split('-');
-  return `${dd}/${m}/${y}`;
-}
-
-function dateStatus(d) {
-  if (!d) return null;
-  const t = today();
-  if (d < t) return 'overdue';
-  if (d === t) return 'today';
-  if ((new Date(d) - new Date(t)) / 86400000 <= 3) return 'soon';
-  return 'normal';
-}
-
-function esc(s) {
-  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function setSyncStatus(state, label) {
-  document.getElementById('sync-dot').className = 'sync-dot ' + state;
-  document.getElementById('sync-label').textContent = label;
-}
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
-}
-
-// ── Modal ─────────────────────────────────────────────────────
-window.togglePrazoFields = function () {
-  const isPrazo = document.getElementById('m-cat').value === 'prazo';
-  document.getElementById('prazo-fields').style.display = isPrazo ? '' : 'none';
-  if (!isPrazo) {
-    document.getElementById('m-processo').value = '';
-    document.getElementById('m-autor').value = '';
-    document.getElementById('m-reu').value = '';
+// ─── Render orchestrator ───────────────────────────────────────
+function renderAll() {
+  renderStats();
+  renderListsNav();
+  if (currentView === 'payments') {
+    renderPayments();
+  } else {
+    renderTaskList();
   }
-};
-
-window.openModal = function (id) {
-  editId = id || null;
-  const t = id ? tasks.find(x => x._id === id) : null;
-  document.getElementById('modal-title-el').textContent = id ? 'Editar tarefa' : 'Nova tarefa';
-  document.getElementById('modal-save-btn').querySelector('.btn-label').textContent = id ? 'Salvar' : 'Adicionar';
-  document.getElementById('m-title').value    = t ? t.title : '';
-  document.getElementById('m-cat').value      = t ? t.cat   : 'prazo';
-  document.getElementById('m-prio').value     = t ? t.prio  : 'alta';
-  document.getElementById('m-date').value     = t ? (t.date || '') : '';
-  document.getElementById('m-note').value     = t ? (t.note || '') : '';
-  document.getElementById('m-processo').value = t ? (t.processo || '') : '';
-  document.getElementById('m-autor').value    = t ? (t.autor || '') : '';
-  document.getElementById('m-reu').value      = t ? (t.reu || '') : '';
-  // Popular seletor de lista
-  const mList = document.getElementById('m-list');
-  mList.innerHTML = '<option value="">— Sem lista —</option>' +
-    lists.map(l => `<option value="${l._id}"${(t ? t.listId : activeListId) === l._id ? ' selected' : ''}>${l.emoji} ${esc(l.name)}</option>`).join('');
-  togglePrazoFields();
-  document.getElementById('modal-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('m-title').focus(), 100);
-};
-
-window.closeModal = function () {
-  document.getElementById('modal-overlay').classList.remove('open');
-  editId = null;
-};
-
-window.handleOverlayClick = function (e) {
-  if (e.target.id === 'modal-overlay') closeModal();
-};
-
-window.saveModal = async function () {
-  const title = document.getElementById('m-title').value.trim();
-  if (!title) { document.getElementById('m-title').focus(); return; }
-  const COL = getUserCol(); if (!COL) return;
-  const btn = document.getElementById('modal-save-btn');
-  btn.classList.add('loading');
-  const cat = document.getElementById('m-cat').value;
-  const data = {
-    title,
-    cat,
-    prio:     document.getElementById('m-prio').value,
-    date:     document.getElementById('m-date').value,
-    note:     document.getElementById('m-note').value.trim(),
-    processo: cat === 'prazo' ? document.getElementById('m-processo').value.trim() : '',
-    autor:    cat === 'prazo' ? document.getElementById('m-autor').value.trim() : '',
-    reu:      cat === 'prazo' ? document.getElementById('m-reu').value.trim() : '',
-    listId:   document.getElementById('m-list').value || null,
-  };
-  try {
-    if (editId) {
-      await updateDoc(doc(db, 'users', auth.currentUser.uid, 'tasks', editId), data);
-      showToast('Tarefa atualizada');
-    } else {
-      data.done = false; data.doneAt = null; data.added = serverTimestamp();
-      await addDoc(COL, data);
-      showToast('Tarefa adicionada');
-    }
-    closeModal();
-  } catch (e) {
-    console.error(e);
-    showToast('Erro ao salvar. Tente novamente.');
-  } finally {
-    btn.classList.remove('loading');
-  }
-};
-
-window.toggleDone = async function (id) {
-  const t = tasks.find(x => x._id === id); if (!t) return;
-  const done = !t.done;
-  try {
-    await updateDoc(doc(db, 'users', auth.currentUser.uid, 'tasks', id), { done, doneAt: done ? Date.now() : null });
-  } catch (e) { showToast('Erro ao atualizar.'); }
-};
-
-window.deleteTask = async function (id) {
-  if (!confirm('Excluir esta tarefa?')) return;
-  try {
-    await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'tasks', id));
-    showToast('Tarefa excluída');
-  } catch (e) { showToast('Erro ao excluir.'); }
-};
-
-window.setFilter = function (cat) { filterCat = cat; render(); };
-
-window.setView = function (v) {
-  view = v;
-  filterCat = 'all';
-  activeListId = null;
-  ['pending', 'today', 'done', 'calendar', 'payments'].forEach(x => document.getElementById('tab-' + x).classList.toggle('active', x === v));
-  document.querySelectorAll('.list-nav-item').forEach(x => x.classList.remove('active'));
-  const hideToolbar = v === 'calendar' || v === 'payments';
-  document.querySelector('.search-wrap').style.display = hideToolbar ? 'none' : '';
-  document.getElementById('filters').style.display     = hideToolbar ? 'none' : '';
-  document.querySelector('.sort-row').style.display    = hideToolbar ? 'none' : '';
-  const fab = document.getElementById('fab');
-  fab.setAttribute('aria-label', v === 'payments' ? 'Novo pagamento' : 'Nova tarefa');
-  // Esconde cabeçalho de lista
-  const lvh = document.getElementById('list-view-header');
-  if (lvh) lvh.style.display = 'none';
-  render();
-};
-
-window.fabAction = function () {
-  if (view === 'payments') openPaymentModal();
-  else openModal();
-};
-
-// ── Render ────────────────────────────────────────────────────
-function getVisible() {
-  let list = tasks.filter(t => {
-    if (activeListId) return t.listId === activeListId && !t.done;
-    if (view === 'pending') return !t.done;
-    if (view === 'done') return t.done;
-    const s = dateStatus(t.date);
-    return !t.done && (s === 'overdue' || s === 'today' || s === 'soon' || t.prio === 'alta');
-  });
-  if (filterCat !== 'all') list = list.filter(t => t.cat === filterCat);
-  if (searchQuery) {
-    const q = searchQuery.toLowerCase();
-    list = list.filter(t => t.title.toLowerCase().includes(q) || (t.note || '').toLowerCase().includes(q) || (t.processo || '').toLowerCase().includes(q) || (t.autor || '').toLowerCase().includes(q) || (t.reu || '').toLowerCase().includes(q));
-  }
-  return [...list].sort((a, b) => {
-    if (sortBy === 'prio') { const p = { alta: 0, media: 1, baixa: 2 }; return (p[a.prio] || 0) - (p[b.prio] || 0) || (a.date || 'z').localeCompare(b.date || 'z'); }
-    if (sortBy === 'date') return (a.date || 'z').localeCompare(b.date || 'z');
-    if (sortBy === 'cat')  return a.cat.localeCompare(b.cat);
-    return (b.added?.seconds || 0) - (a.added?.seconds || 0);
-  });
 }
 
 function renderStats() {
-  const pend  = tasks.filter(x => !x.done);
-  const urg   = pend.filter(x => { const s = dateStatus(x.date); return x.prio === 'alta' || s === 'overdue' || s === 'today' || s === 'soon'; });
-  const tod   = pend.filter(x => { const s = dateStatus(x.date); return s === 'overdue' || s === 'today'; });
-  const done7 = tasks.filter(x => x.done && x.doneAt && Date.now() - x.doneAt < 7 * 86400000);
-  document.getElementById('stats').innerHTML =
-    `<div class="stat stat-btn" onclick="setView('pending')" title="Ver pendentes"><div class="stat-n">${pend.length}</div><div class="stat-l">Pendentes</div></div>` +
-    `<div class="stat stat-btn" onclick="setView('today')" title="Ver urgentes"><div class="stat-n red">${urg.length}</div><div class="stat-l">Urgentes</div></div>` +
-    `<div class="stat stat-btn" onclick="setView('today')" title="Ver para hoje"><div class="stat-n amber">${tod.length}</div><div class="stat-l">Para hoje</div></div>` +
-    `<div class="stat stat-btn" onclick="setView('done')" title="Ver concluídas"><div class="stat-n green">${done7.length}</div><div class="stat-l">Concluídas 7d</div></div>`;
-}
+  const pending = tasks.filter(t => !t.done).length;
+  const doneToday = tasks.filter(t => {
+    if (!t.done || !t.doneAt) return false;
+    const d = new Date(t.doneAt);
+    const n = new Date();
+    return d.toDateString() === n.toDateString();
+  }).length;
 
-function renderFilters() {
-  const used = Object.keys(CATS).filter(c => tasks.some(t => t.cat === c));
-  document.getElementById('filters').innerHTML =
-    `<span class="chip all${filterCat === 'all' ? ' sel' : ''}" onclick="setFilter('all')">Todas</span>` +
-    used.map(c => `<span class="chip ${CATS[c].cls}${filterCat === c ? ' sel' : ''}" onclick="setFilter('${c}')">${CATS[c].icon} ${CATS[c].label}</span>`).join('');
-}
+  const mStr = payMonthStr(payYear, payMonth);
+  const paidAmt = payments
+    .filter(p => p.month === mStr)
+    .reduce((s, p) => s + (p.amount || 0), 0);
 
-function taskHtml(t) {
-  const s  = dateStatus(t.date);
-  const pc = PRIO[t.prio] || PRIO.media;
-  const dc = s === 'overdue' ? 'overdue' : s === 'today' ? 'today' : s === 'soon' ? 'soon' : '';
-  const di = s === 'overdue' ? 'ti-alert-triangle' : s === 'today' ? 'ti-calendar-event' : 'ti-calendar';
-  const dt = t.date
-    ? `<span class="task-date ${dc}"><i class="ti ${di}" style="font-size:12px"></i> ${s === 'overdue' ? 'Venceu ' + fmtDate(t.date) : s === 'today' ? 'Hoje' : fmtDate(t.date)}</span>`
-    : '';
-  const nc = t.noteCount || 0;
-  const postits = nc > 0
-    ? `<div class="card-postits"><i class="ti ti-note card-postit-icon"></i><span class="card-postit-text">${esc(t.notePreview || '')}</span>${nc > 1 ? `<span class="card-postit-count">+${nc - 1}</span>` : ''}</div>`
-    : '';
-  // Barra de progresso de subtarefas
-  const subs = t.subtasks || [];
-  const subDone = subs.filter(s => s.done).length;
-  const subTotal = subs.length;
-  const subBar = subTotal > 0
-    ? `<div class="card-subtask-bar"><div class="card-subtask-track"><div class="card-subtask-fill" style="width:${Math.round(subDone / subTotal * 100)}%"></div></div><span class="card-subtask-label">${subDone}/${subTotal}</span></div>`
-    : '';
-  return `<div class="task-card${t.done ? ' done' : ''}">` +
-    `<div class="prio-bar" style="background:${t.done ? 'var(--border)' : pc.color}"></div>` +
-    `<div class="cb${t.done ? ' checked' : ''}" onclick="toggleDone('${t._id}')" role="checkbox" aria-checked="${t.done}" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter')toggleDone('${t._id}')">${t.done ? '<i class="ti ti-check" style="font-size:11px;color:var(--bg)"></i>' : ''}</div>` +
-    `<div class="task-body" onclick="openDetail('${t._id}')" style="cursor:pointer">` +
-      `<div class="task-title">${esc(t.title)}</div>` +
-      (t.cat === 'prazo' && t.processo ? `<div class="task-processo"><i class="ti ti-file-text" style="font-size:11px;flex-shrink:0"></i><strong>${esc(t.processo)}</strong></div>` : '') +
-      (t.cat === 'prazo' && (t.autor || t.reu) ? `<div class="task-partes">${esc(t.autor || '—')} <span style="color:var(--text3);font-weight:400">×</span> ${esc(t.reu || '—')}</div>` : '') +
-      `<div class="task-meta" style="margin-top:${t.cat === 'prazo' && (t.processo || t.autor) ? '5px' : '4px'}"><span class="chip ${CATS[t.cat]?.cls || 'outro'}" style="font-size:11px;padding:2px 7px">${CATS[t.cat]?.icon || ''} ${CATS[t.cat]?.label || t.cat}</span>${dt}${(() => { const l = lists.find(x => x._id === t.listId); return (!activeListId && l) ? `<span class="list-badge-card">${l.emoji} ${esc(l.name)}</span>` : ''; })()}</div>` +
-      (t.note ? `<div class="task-note">${esc(t.note)}</div>` : '') +
-      postits +
-      subBar +
-    `</div>` +
-    `<div class="task-actions">` +
-      `<button class="icon-btn" onclick="openModal('${t._id}')" aria-label="Editar"><i class="ti ti-edit"></i></button>` +
-      `<button class="icon-btn" onclick="deleteTask('${t._id}')" aria-label="Excluir"><i class="ti ti-trash"></i></button>` +
-    `</div></div>`;
-}
-
-function renderList() {
-  const el   = document.getElementById('list');
-  const list = getVisible();
-  if (!list.length) {
-    el.innerHTML = `<div class="empty"><i class="ti ti-mood-smile"></i>${
-      view === 'done'  ? 'Nenhuma tarefa concluída ainda.' :
-      view === 'today' ? 'Nenhuma tarefa urgente ou para hoje!' :
-                         'Nenhuma tarefa pendente. Bom trabalho!'
-    }</div>`;
-    return;
-  }
-  let html = '<div class="task-grid">';
-  if (view === 'pending') {
-    const over = list.filter(t => dateStatus(t.date) === 'overdue');
-    const rest = list.filter(t => dateStatus(t.date) !== 'overdue');
-    if (over.length) {
-      html += `<div class="section-label"><i class="ti ti-alert-circle" style="font-size:13px"></i>Vencidas</div>`;
-      over.forEach(t => { html += taskHtml(t); });
-      if (rest.length) {
-        html += `<div class="section-label" style="margin-top:.5rem">Demais tarefas</div>`;
-        rest.forEach(t => { html += taskHtml(t); });
-      }
-    } else {
-      list.forEach(t => { html += taskHtml(t); });
-    }
-  } else {
-    list.forEach(t => { html += taskHtml(t); });
-  }
-  html += '</div>';
-  el.innerHTML = html;
-}
-
-function renderLists() {
-  const el = document.getElementById('lists-nav');
-  if (!el) return;
-  if (!lists.length) { el.innerHTML = ''; return; }
-  el.innerHTML = lists.map(l => {
-    const count = tasks.filter(t => t.listId === l._id && !t.done).length;
-    return `<div class="list-nav-item${activeListId === l._id ? ' active' : ''}" onclick="setList('${l._id}')">
-      <span class="list-nav-emoji">${l.emoji}</span>
-      <span class="list-nav-name">${esc(l.name)}</span>
-      <span class="list-nav-actions">
-        <button class="list-action-btn" onclick="event.stopPropagation();openListModal('${l._id}')" title="Renomear lista"><i class="ti ti-pencil"></i></button>
-        <button class="list-action-btn danger" onclick="event.stopPropagation();deleteList('${l._id}')" title="Excluir lista"><i class="ti ti-trash"></i></button>
-      </span>
-      ${count > 0 ? `<span class="list-nav-count">${count}</span>` : ''}
+  $('stats').innerHTML = `
+    <div class="stat-box accent">
+      <div class="stat-num">${pending}</div>
+      <div class="stat-label">Pendentes</div>
+    </div>
+    <div class="stat-box green">
+      <div class="stat-num">${doneToday}</div>
+      <div class="stat-label">Feitas hoje</div>
     </div>`;
+}
+
+// ─── Lists nav ─────────────────────────────────────────────────
+function renderListsNav() {
+  const nav = $('lists-nav');
+  if (!lists.length) { nav.innerHTML = ''; return; }
+  nav.innerHTML = lists.map(l => {
+    const count = tasks.filter(t => !t.done && t.listId === l._id).length;
+    const active = currentView === l._id ? ' active' : '';
+    return `<button class="list-nav-item${active}" onclick="setView('${l._id}')">
+      <span>${escHtml(l.emoji || '📋')}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(l.name)}</span>
+      <span class="list-nav-badge">${count || ''}</span>
+      <span class="list-nav-actions">
+        <button class="icon-btn-sm" onclick="event.stopPropagation();editList('${l._id}')" title="Editar"><i class="ti ti-pencil"></i></button>
+        <button class="icon-btn-sm" onclick="event.stopPropagation();deleteList('${l._id}')" title="Excluir"><i class="ti ti-trash"></i></button>
+      </span>
+    </button>`;
   }).join('');
 }
 
-window.setList = function (id) {
-  activeListId = id;
-  filterCat = 'all';
-  // Desativa tabs e ativa item de lista
-  ['pending', 'today', 'done', 'calendar', 'payments'].forEach(x => {
-    const el = document.getElementById('tab-' + x);
-    if (el) el.classList.remove('active');
-  });
-  document.querySelectorAll('.list-nav-item').forEach(x => x.classList.toggle('active', x.getAttribute('onclick') === `setList('${id}')`));
-  document.querySelector('.search-wrap').style.display = '';
-  document.getElementById('filters').style.display     = '';
-  document.querySelector('.sort-row').style.display    = '';
-  // Exibe cabeçalho com nome e emoji da lista
-  const lvh = document.getElementById('list-view-header');
-  const l = lists.find(x => x._id === id);
-  if (lvh && l) {
-    lvh.innerHTML = `<span class="list-header-emoji">${l.emoji}</span><span class="list-header-name">${esc(l.name)}</span>`;
-    lvh.style.display = 'flex';
-  }
-  render();
+// ─── View switching ────────────────────────────────────────────
+window.setView = function(view) {
+  currentView = view;
+  recurringEditMode = false;
+
+  // Tabs
+  $('tab-pending').classList.toggle('active', view === 'pending' || isListView());
+  $('tab-payments').classList.toggle('active', view === 'payments');
+
+  // Quick-add & FAB
+  $('quick-add').style.display = (view === 'payments') ? 'none' : '';
+
+  renderAll();
 };
 
-// ── CRUD de Listas ────────────────────────────────────────────
-window.openListModal = function (id) {
-  editListId = id || null;
-  const l = id ? lists.find(x => x._id === id) : null;
-  document.getElementById('list-modal-title').textContent = id ? 'Editar lista' : 'Nova lista';
-  document.getElementById('list-modal-name').value = l ? l.name : '';
-  // Selecionar emoji atual
-  const currentEmoji = l ? l.emoji : '💼';
-  document.querySelectorAll('.list-emoji-btn').forEach(b => {
-    b.classList.toggle('sel', b.dataset.emoji === currentEmoji);
-  });
-  document.getElementById('list-modal-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('list-modal-name').focus(), 100);
-};
-
-window.closeListModal = function () {
-  document.getElementById('list-modal-overlay').classList.remove('open');
-  editListId = null;
-};
-
-window.saveList = async function () {
-  const name = document.getElementById('list-modal-name').value.trim();
-  if (!name) { document.getElementById('list-modal-name').focus(); return; }
-  const emojiSel = document.querySelector('.list-emoji-btn.sel');
-  const emoji = emojiSel ? emojiSel.dataset.emoji : '💼';
-  const COL = getListCol(); if (!COL) return;
-  try {
-    if (editListId) {
-      await updateDoc(doc(db, 'users', auth.currentUser.uid, 'lists', editListId), { name, emoji });
-      showToast('Lista atualizada');
-    } else {
-      await addDoc(COL, { name, emoji, createdAt: serverTimestamp(), order: lists.length });
-      showToast('Lista criada');
-    }
-    closeListModal();
-  } catch (e) { console.error(e); showToast('Erro ao salvar lista.'); }
-};
-
-window.deleteList = async function (id) {
-  const l = lists.find(x => x._id === id);
-  if (!confirm(`Excluir a lista "${l?.name}"?\nAs tarefas ficarão sem lista associada.`)) return;
-  try {
-    // Remover listId das tarefas desta lista
-    const uid = auth.currentUser?.uid; if (!uid) return;
-    const snap = await getDocs(collection(db, 'users', uid, 'tasks'));
-    const batch = writeBatch(db);
-    snap.docs.filter(d => d.data().listId === id).forEach(d => batch.update(d.ref, { listId: null }));
-    batch.delete(doc(db, 'users', uid, 'lists', id));
-    await batch.commit();
-    if (activeListId === id) { activeListId = null; setView('pending'); }
-    showToast('Lista excluída');
-  } catch (e) { console.error(e); showToast('Erro ao excluir lista.'); }
-};
-
-window.selectListEmoji = function (btn) {
-  document.querySelectorAll('.list-emoji-btn').forEach(b => b.classList.remove('sel'));
-  btn.classList.add('sel');
-};
-
-window.render = function () {
-  renderStats();
-  renderLists();
-  if (view === 'payments')             { renderPayments(); }
-  else if (view === 'calendar' && !activeListId) { renderCalendar(); }
-  else                                 { renderFilters(); renderList(); }
-  // Atualiza subtarefas no painel de detalhe se estiver aberto
-  if (detailTaskId) renderSubtasks(detailTaskId);
-};
-
-// ── Calendário ────────────────────────────────────────────────
-const CAL_MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const CAL_DOW    = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-
-function renderCalendar() {
-  const el  = document.getElementById('list');
-  const pad = n => String(n).padStart(2, '0');
-  const todayStr    = today();
-  const firstDay    = new Date(calYear, calMonth, 1);
-  const lastDay     = new Date(calYear, calMonth + 1, 0);
-  const startDow    = firstDay.getDay();
-  const totalDays   = lastDay.getDate();
-  const monthPrefix = `${calYear}-${pad(calMonth + 1)}`;
-
-  const tasksByDay = {};
-  tasks.filter(t => !t.done && t.date && t.date.startsWith(monthPrefix)).forEach(t => {
-    const d = parseInt(t.date.split('-')[2]);
-    (tasksByDay[d] = tasksByDay[d] || []).push(t);
-  });
-
-  let html = `<div class="cal-wrap">`;
-  html += `<div class="cal-header"><div class="cal-title">${CAL_MONTHS[calMonth]} ${calYear}</div>`;
-  html += `<div style="display:flex;align-items:center;gap:8px">`;
-  html += `<div class="cal-nav"><button onclick="calPrev()"><i class="ti ti-chevron-left"></i></button><button onclick="calNext()"><i class="ti ti-chevron-right"></i></button></div>`;
-  html += `<button class="cal-today-btn" onclick="calToday()">Hoje</button></div></div>`;
-
-  html += `<div class="cal-grid">`;
-  CAL_DOW.forEach(d => { html += `<div class="cal-dow">${d}</div>`; });
-
-  const prevLast = new Date(calYear, calMonth, 0).getDate();
-  for (let i = startDow - 1; i >= 0; i--) {
-    html += `<div class="cal-day other-month"><div class="cal-day-num">${prevLast - i}</div></div>`;
-  }
-
-  for (let d = 1; d <= totalDays; d++) {
-    const dateStr  = `${calYear}-${pad(calMonth + 1)}-${pad(d)}`;
-    const isToday  = dateStr === todayStr;
-    const isPast   = dateStr < todayStr;
-    const dayTasks = tasksByDay[d] || [];
-    html += `<div class="cal-day${isToday ? ' today' : ''}"><div class="cal-day-num">${d}</div>`;
-    dayTasks.slice(0, 2).forEach(t => {
-      const cls = isPast ? 'overdue' : isToday ? 'today-ev' : t.cat === 'prazo' ? 'prazo' : 'other';
-      const icon = CATS[t.cat]?.icon || '';
-      html += `<div class="cal-event ${cls}" onclick="openDetail('${t._id}')" title="${esc(t.title)}">${icon} ${esc(t.title)}</div>`;
-    });
-    if (dayTasks.length > 2) html += `<div class="cal-more">+${dayTasks.length - 2} mais</div>`;
-    html += `</div>`;
-  }
-
-  const trailing = (startDow + totalDays) % 7;
-  for (let d = 1; d <= (trailing === 0 ? 0 : 7 - trailing); d++) {
-    html += `<div class="cal-day other-month"><div class="cal-day-num">${d}</div></div>`;
-  }
-  html += `</div>`;
-
-  html += `<div class="cal-legend">`;
-  html += `<div class="cal-legend-item"><div class="cal-legend-dot" style="background:#FDECEA;border-left-color:var(--red)"></div>Vencido</div>`;
-  html += `<div class="cal-legend-item"><div class="cal-legend-dot" style="background:#FFF3DC;border-left-color:var(--amber)"></div>Hoje</div>`;
-  html += `<div class="cal-legend-item"><div class="cal-legend-dot" style="background:var(--prazo-bg);border-left-color:var(--prazo-sel)"></div>Prazo judicial</div>`;
-  html += `<div class="cal-legend-item"><div class="cal-legend-dot" style="background:var(--bg2);border-left-color:var(--border2)"></div>Outros</div>`;
-  html += `</div></div>`;
-
-  el.innerHTML = html;
+function isListView() {
+  return currentView !== 'pending' && currentView !== 'payments';
 }
 
-window.calPrev  = function () { calMonth--; if (calMonth < 0)  { calMonth = 11; calYear--; } renderCalendar(); };
-window.calNext  = function () { calMonth++; if (calMonth > 11) { calMonth = 0;  calYear++; } renderCalendar(); };
-window.calToday = function () { const d = new Date(); calYear = d.getFullYear(); calMonth = d.getMonth(); renderCalendar(); };
+// ─── Task list render ──────────────────────────────────────────
+function renderTaskList() {
+  const hdr = $('list-view-header');
+  const listEl = $('list');
 
-// ── Data no header ────────────────────────────────────────────
-(function () {
-  const d     = new Date();
-  const dias  = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-  const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-  document.getElementById('date-label').textContent = `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;
-})();
+  let viewTasks = [];
+  if (currentView === 'pending') {
+    hdr.style.display = 'none';
+    viewTasks = tasks.filter(t => !t.listId);
+  } else {
+    const lst = lists.find(l => l._id === currentView);
+    hdr.style.display = lst ? 'flex' : 'none';
+    if (lst) {
+      hdr.innerHTML = `
+        <button class="view-back-btn" onclick="setView('pending')" title="Voltar"><i class="ti ti-arrow-left"></i></button>
+        <div class="view-title">${escHtml(lst.emoji || '📋')} ${escHtml(lst.name)}</div>`;
+    }
+    viewTasks = tasks.filter(t => t.listId === currentView);
+  }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDetail(); closePaymentModal(); } });
+  const pending = viewTasks.filter(t => !t.done);
+  const done    = viewTasks.filter(t => t.done);
 
-// ── Busca ─────────────────────────────────────────────────────
-window.setSearch = function (val) {
-  searchQuery = val;
-  document.getElementById('search-clear').style.display = val ? '' : 'none';
-  render();
+  if (!viewTasks.length) {
+    listEl.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📝</div>
+      Nada aqui ainda.<br>Adicione sua primeira pendência acima.
+    </div>`;
+    return;
+  }
+
+  let html = '';
+  html += pending.map(t => taskRowHtml(t)).join('');
+
+  if (done.length) {
+    html += `<div class="done-notice"><i class="ti ti-clock-hour-4"></i> Concluídas · serão removidas em 24h</div>`;
+    html += done.map(t => taskRowHtml(t)).join('');
+  }
+
+  listEl.innerHTML = html;
+}
+
+function taskRowHtml(t) {
+  const doneClass = t.done ? ' done' : '';
+  const cbClass   = t.done ? ' checked' : '';
+  const noteHtml  = t.note ? `<div class="task-row-note">${escHtml(t.note)}</div>` : '';
+  return `<div class="task-row${doneClass}" data-id="${t._id}">
+    <div class="task-cb${cbClass}" onclick="toggleDone('${t._id}')">
+      ${t.done ? '<i class="ti ti-check" style="font-size:.7rem"></i>' : ''}
+    </div>
+    <div class="task-row-body">
+      <div class="task-row-title">${escHtml(t.title)}</div>
+      ${noteHtml}
+    </div>
+    <div class="task-row-actions">
+      <button onclick="deleteTask('${t._id}')" title="Excluir"><i class="ti ti-trash"></i></button>
+    </div>
+  </div>`;
+}
+
+// ─── Quick-add ─────────────────────────────────────────────────
+document.getElementById('qa-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); quickAdd(); }
+  if (e.key === 'Tab')   { e.preventDefault(); toggleQaNoteRow(); }
+});
+
+window.toggleQaNoteRow = function() {
+  const nr = $('qa-note-row');
+  const open = nr.classList.toggle('open');
+  if (open) setTimeout(() => $('qa-note').focus(), 50);
 };
 
-window.clearSearch = function () {
-  searchQuery = '';
-  document.getElementById('search-input').value = '';
-  document.getElementById('search-clear').style.display = 'none';
-  render();
+window.closeQaNote = function() {
+  $('qa-note-row').classList.remove('open');
+  $('qa-note').value = '';
+  $('qa-input').focus();
 };
 
-// ── Modal de detalhes ─────────────────────────────────────────
-window.openDetail = function (id) {
+window.quickAdd = async function() {
+  const title = $('qa-input').value.trim();
+  if (!title) { $('qa-input').focus(); return; }
+  const note  = $('qa-note').value.trim();
+  const listId = isListView() ? currentView : null;
+
+  $('qa-input').value = '';
+  $('qa-note').value = '';
+  $('qa-note-row').classList.remove('open');
+
+  try {
+    const data = { title, done: false, doneAt: null, added: serverTimestamp() };
+    if (note) data.note = note;
+    if (listId) data.listId = listId;
+    await addDoc(userCol('tasks'), data);
+  } catch(e) {
+    showToast('Erro ao adicionar');
+  }
+};
+
+// ─── Task CRUD ─────────────────────────────────────────────────
+window.toggleDone = async function(id) {
   const t = tasks.find(x => x._id === id);
   if (!t) return;
-  detailTaskId = id;
-
-  document.getElementById('detail-title').textContent = t.title;
-
-  const s  = dateStatus(t.date);
-  const pc = PRIO[t.prio] || PRIO.media;
-  const dc = s === 'overdue' ? 'overdue' : s === 'today' ? 'today' : s === 'soon' ? 'soon' : '';
-  const di = s === 'overdue' ? 'ti-alert-triangle' : s === 'today' ? 'ti-calendar-event' : 'ti-calendar';
-  const prioLabel = { alta: 'Alta', media: 'Média', baixa: 'Baixa' }[t.prio] || t.prio;
-  document.getElementById('detail-meta').innerHTML =
-    `<span class="chip ${CATS[t.cat]?.cls || 'outro'}">${CATS[t.cat]?.icon || ''} ${CATS[t.cat]?.label || t.cat}</span>` +
-    `<span style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)"><span style="width:8px;height:8px;border-radius:50%;background:${pc.color};display:inline-block;flex-shrink:0"></span>${prioLabel}</span>` +
-    (t.date ? `<span class="task-date ${dc}"><i class="ti ${di}" style="font-size:12px"></i> ${s === 'overdue' ? 'Venceu ' + fmtDate(t.date) : s === 'today' ? 'Hoje' : fmtDate(t.date)}</span>` : '') +
-    (t.cat === 'prazo' && t.processo ? `<div style="width:100%;margin-top:6px;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:5px"><i class="ti ti-file-text" style="font-size:12px;flex-shrink:0"></i><strong style="font-weight:500">${esc(t.processo)}</strong></div>` : '') +
-    (t.cat === 'prazo' && (t.autor || t.reu) ? `<div style="width:100%;font-size:13px;color:var(--prazo-c);font-weight:500;margin-top:2px">${esc(t.autor || '—')} <span style="color:var(--text3);font-weight:400">×</span> ${esc(t.reu || '—')}</div>` : '');
-
-  const noteEl = document.getElementById('detail-note-text');
-  noteEl.textContent = t.note || '';
-  noteEl.style.display = t.note ? '' : 'none';
-
-  document.getElementById('detail-edit-btn').onclick = () => { closeDetail(); openModal(id); };
-  document.getElementById('note-form').style.display = 'none';
-  document.getElementById('note-text-input').value = '';
-  initNoteColors();
-
-  renderSubtasks(id);
-  document.getElementById('detail-overlay').classList.add('open');
-  document.getElementById('main-app').classList.add('detail-open');
-  startListeningNotes(id);
-};
-
-window.closeDetail = function () {
-  document.getElementById('detail-overlay').classList.remove('open');
-  document.getElementById('main-app').classList.remove('detail-open');
-  if (unsubNotes) { unsubNotes(); unsubNotes = null; }
-  detailTaskId = null;
-};
-
-window.handleDetailOverlayClick = function (e) {
-  if (e.target.id === 'detail-overlay') closeDetail();
-};
-
-// ── Subtarefas ────────────────────────────────────────────────
-function renderSubtasks(taskId) {
-  const el = document.getElementById('detail-subtasks');
-  if (!el) return;
-  const t = tasks.find(x => x._id === taskId);
-  if (!t) { el.innerHTML = ''; return; }
-  const subs = t.subtasks || [];
-  const done = subs.filter(s => s.done).length;
-  const total = subs.length;
-  const pct = total > 0 ? Math.round(done / total * 100) : 0;
-  el.innerHTML =
-    `<div class="subtask-header">` +
-      `<span class="section-label" style="margin:0">Subtarefas</span>` +
-      (total > 0 ? `<span class="subtask-count">${done}/${total}</span>` : '') +
-    `</div>` +
-    (total > 0 ? `<div class="subtask-progress"><div class="subtask-progress-fill" style="width:${pct}%"></div></div>` : '') +
-    subs.map(s =>
-      `<div class="subtask-item">` +
-        `<button class="subtask-cb${s.done ? ' done' : ''}" onclick="toggleSubtask('${taskId}','${s.id}')" aria-label="Toggle subtarefa">` +
-          (s.done ? `<i class="ti ti-check" style="font-size:10px"></i>` : '') +
-        `</button>` +
-        `<span class="subtask-text${s.done ? ' done' : ''}">${esc(s.text)}</span>` +
-        `<button class="subtask-del" onclick="deleteSubtask('${taskId}','${s.id}')" aria-label="Excluir subtarefa"><i class="ti ti-x" style="font-size:11px"></i></button>` +
-      `</div>`
-    ).join('') +
-    `<div class="subtask-add">` +
-      `<input type="text" id="subtask-input" class="subtask-add-input" placeholder="+ Adicionar subtarefa…" maxlength="120"` +
-        ` onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask('${taskId}');}">` +
-      `<button class="icon-btn" onclick="addSubtask('${taskId}')" aria-label="Adicionar"><i class="ti ti-plus" style="font-size:14px"></i></button>` +
-    `</div>`;
-}
-
-window.toggleSubtask = async function (taskId, subtaskId) {
-  const t = tasks.find(x => x._id === taskId);
-  if (!t) return;
-  const subtasks = (t.subtasks || []).map(s => s.id === subtaskId ? { ...s, done: !s.done } : s);
   try {
-    await updateDoc(doc(db, 'users', auth.currentUser.uid, 'tasks', taskId), { subtasks });
-  } catch (e) { console.error(e); showToast('Erro ao atualizar subtarefa.'); }
+    await updateDoc(userDoc('tasks', id), {
+      done: !t.done,
+      doneAt: !t.done ? Date.now() : null
+    });
+  } catch(e) { showToast('Erro ao atualizar'); }
 };
 
-window.addSubtask = async function (taskId) {
-  const input = document.getElementById('subtask-input');
-  const text = input?.value.trim();
-  if (!text) { input?.focus(); return; }
-  const t = tasks.find(x => x._id === taskId);
-  if (!t) return;
-  const subtasks = [...(t.subtasks || []), { id: crypto.randomUUID(), text, done: false }];
+window.deleteTask = async function(id) {
   try {
-    await updateDoc(doc(db, 'users', auth.currentUser.uid, 'tasks', taskId), { subtasks });
-    if (input) input.value = '';
-    input?.focus();
-  } catch (e) { console.error(e); showToast('Erro ao adicionar subtarefa.'); }
+    await deleteDoc(userDoc('tasks', id));
+  } catch(e) { showToast('Erro ao excluir'); }
 };
 
-window.deleteSubtask = async function (taskId, subtaskId) {
-  if (!confirm('Excluir esta subtarefa?')) return;
-  const t = tasks.find(x => x._id === taskId);
-  if (!t) return;
-  const subtasks = (t.subtasks || []).filter(s => s.id !== subtaskId);
-  try {
-    await updateDoc(doc(db, 'users', auth.currentUser.uid, 'tasks', taskId), { subtasks });
-  } catch (e) { console.error(e); showToast('Erro ao excluir subtarefa.'); }
-};
-
-// ── Post-its ──────────────────────────────────────────────────
-function startListeningNotes(taskId) {
-  if (unsubNotes) { unsubNotes(); unsubNotes = null; }
-  const uid = auth.currentUser?.uid;
-  if (!uid) return;
-  const col = collection(db, 'users', uid, 'tasks', taskId, 'notes');
-  unsubNotes = onSnapshot(col, snap => {
-    const notes = snap.docs.map(d => ({ ...d.data(), _id: d.id }))
-      .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
-    renderNotes(notes, taskId);
-  });
-}
-
-function renderNotes(notes, taskId) {
-  const board = document.getElementById('postit-board');
-  if (!notes.length) {
-    board.innerHTML = '<span class="postit-empty">Nenhum post-it ainda. Adicione o primeiro!</span>';
-    return;
-  }
-  board.innerHTML = notes.map(n => {
-    const rot  = n.rotation || 0;
-    const date = n.createdAt
-      ? new Date(n.createdAt.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-      : '';
-    return `<div class="postit" style="background:${n.color};transform:rotate(${rot}deg)">` +
-      `<div class="postit-text">${esc(n.text)}</div>` +
-      `<span class="postit-date">${date}</span>` +
-      `<button class="postit-delete" onclick="deleteNote('${taskId}','${n._id}')" aria-label="Excluir post-it"><i class="ti ti-x"></i></button>` +
-      `</div>`;
-  }).join('');
-}
-
-function initNoteColors() {
-  selectedNoteColor = NOTE_COLORS[0];
-  document.getElementById('note-colors').innerHTML = NOTE_COLORS.map((c, i) =>
-    `<button class="note-color-btn${i === 0 ? ' sel' : ''}" style="background:${c}" onclick="selectNoteColor('${c}',this)" aria-label="Cor ${i + 1}"></button>`
-  ).join('');
-}
-
-window.selectNoteColor = function (color, btn) {
-  selectedNoteColor = color;
-  document.querySelectorAll('.note-color-btn').forEach(b => b.classList.remove('sel'));
-  btn.classList.add('sel');
-};
-
-window.toggleNoteForm = function () {
-  const form = document.getElementById('note-form');
-  const opening = form.style.display === 'none';
-  form.style.display = opening ? '' : 'none';
-  if (opening) setTimeout(() => document.getElementById('note-text-input').focus(), 50);
-};
-
-window.saveNote = async function () {
-  const text = document.getElementById('note-text-input').value.trim();
-  if (!text || !detailTaskId) return;
-  const uid = auth.currentUser?.uid;
-  if (!uid) return;
-  const col     = collection(db, 'users', uid, 'tasks', detailTaskId, 'notes');
-  const taskRef = doc(db, 'users', uid, 'tasks', detailTaskId);
-  try {
-    await Promise.all([
-      addDoc(col, { text, color: selectedNoteColor, rotation: parseFloat((Math.random() * 6 - 3).toFixed(1)), createdAt: serverTimestamp() }),
-      updateDoc(taskRef, { noteCount: increment(1), notePreview: text }),
-    ]);
-    document.getElementById('note-text-input').value = '';
-    document.getElementById('note-form').style.display = 'none';
-  } catch (e) {
-    console.error(e);
-    showToast('Erro ao salvar post-it.');
+// ─── Task modal (mobile FAB) ───────────────────────────────────
+window.fabAction = function() {
+  if (currentView === 'payments') {
+    openPaymentModal();
+  } else {
+    openTaskModal();
   }
 };
 
-window.deleteNote = async function (taskId, noteId) {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return;
-  const task    = tasks.find(x => x._id === taskId);
-  const isLast  = (task?.noteCount || 1) <= 1;
-  const taskRef = doc(db, 'users', uid, 'tasks', taskId);
+function openTaskModal() {
+  $('modal-title-el').textContent = 'Nova pendência';
+  $('modal-save-btn').querySelector('.btn-label').textContent = 'Adicionar';
+  $('m-title').value = '';
+  $('m-note').value = '';
+
+  const sel = $('m-list');
+  if (lists.length) {
+    sel.style.display = '';
+    sel.innerHTML = `<option value="">Sem lista</option>` +
+      lists.map(l => `<option value="${l._id}">${escHtml(l.emoji || '')} ${escHtml(l.name)}</option>`).join('');
+    if (isListView()) sel.value = currentView;
+    else sel.value = '';
+  } else {
+    sel.style.display = 'none';
+  }
+
+  openOverlay('modal-overlay');
+  setTimeout(() => $('m-title').focus(), 60);
+}
+
+window.saveModal = async function() {
+  const title = $('m-title').value.trim();
+  if (!title) { $('m-title').focus(); return; }
+  const note   = $('m-note').value.trim();
+  const listId = $('m-list').value || null;
+  setLoading('modal-save-btn', true);
   try {
-    await Promise.all([
-      deleteDoc(doc(db, 'users', uid, 'tasks', taskId, 'notes', noteId)),
-      updateDoc(taskRef, { noteCount: increment(-1), ...(isLast ? { notePreview: '' } : {}) }),
-    ]);
-  } catch (e) {
-    showToast('Erro ao excluir post-it.');
+    const data = { title, done: false, doneAt: null, added: serverTimestamp() };
+    if (note)   data.note   = note;
+    if (listId) data.listId = listId;
+    await addDoc(userCol('tasks'), data);
+    closeModal();
+  } catch(e) {
+    showToast('Erro ao adicionar');
+  } finally {
+    setLoading('modal-save-btn', false);
   }
 };
 
-// ── Tema ──────────────────────────────────────────────────────
-const THEME_CYCLE  = ['auto', 'light', 'dark'];
-const THEME_ICONS  = { auto: 'ti-brightness-auto', light: 'ti-sun', dark: 'ti-moon' };
-const THEME_LABELS = { auto: 'Automático', light: 'Claro', dark: 'Escuro' };
-
-function syncThemeIcon() {
-  const t  = localStorage.getItem('birdy-theme') || 'auto';
-  const el = document.getElementById('theme-icon');
-  if (el) el.className = 'ti ' + THEME_ICONS[t];
-}
-
-window.cycleTheme = function () {
-  const cur  = localStorage.getItem('birdy-theme') || 'auto';
-  const next = THEME_CYCLE[(THEME_CYCLE.indexOf(cur) + 1) % THEME_CYCLE.length];
-  localStorage.setItem('birdy-theme', next);
-  if (next === 'auto') document.documentElement.removeAttribute('data-theme');
-  else document.documentElement.setAttribute('data-theme', next);
-  syncThemeIcon();
-  showToast(THEME_LABELS[next]);
+window.closeModal = function() {
+  closeOverlay('modal-overlay');
 };
 
-syncThemeIcon();
-render();
+window.handleOverlayClick = function(e) {
+  if (e.target === $('modal-overlay')) closeModal();
+};
 
-// ── Pagamentos ────────────────────────────────────────────────
-function pad2(n) { return String(n).padStart(2, '0'); }
-function fmtBRL(v) { return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-function payMonthStr(y, m) { return `${y}-${pad2(m + 1)}`; }
-
-function getPayCol() {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return null;
-  return collection(db, 'users', uid, 'payments');
-}
-
-function startListeningPayments(uid) {
-  if (unsubPayments) { unsubPayments(); unsubPayments = null; }
-  const COL = collection(db, 'users', uid, 'payments');
-  unsubPayments = onSnapshot(COL,
-    snap => {
-      payments = snap.docs.map(d => ({ ...d.data(), _id: d.id }));
-      if (view === 'payments') renderPayments();
-    },
-    err => { console.error(err); }
-  );
-}
-
+// ─── Payments view ─────────────────────────────────────────────
 function renderPayments() {
-  const el   = document.getElementById('list');
+  $('list-view-header').style.display = 'none';
+  const listEl = $('list');
   const mStr = payMonthStr(payYear, payMonth);
 
-  const list = payments
-    .filter(p => p.month === mStr)
-    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  const monthLabel = new Date(payYear, payMonth, 1)
+    .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
-  const total   = list.reduce((s, p) => s + (p.amount || 0), 0);
-  const paidAmt = list.filter(p => p.paid).reduce((s, p) => s + (p.amount || 0), 0);
-  const pendAmt = total - paidAmt;
+  // Recurring items + their payment docs this month
+  const recRows = recurring.map(r => {
+    const payDoc = payments.find(p => p.recurringId === r._id && p.month === mStr);
+    return { rec: r, payDoc };
+  });
 
-  let html = `<div class="pay-wrap">`;
+  // One-off payments this month (no recurringId)
+  const oneOffPayments = payments.filter(p => !p.recurringId && p.month === mStr);
 
-  html += `<div class="pay-header">
-    <div class="pay-month-title">${CAL_MONTHS[payMonth]} ${payYear}</div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <div class="cal-nav">
-        <button onclick="payPrev()"><i class="ti ti-chevron-left"></i></button>
-        <button onclick="payNext()"><i class="ti ti-chevron-right"></i></button>
-      </div>
-      <button class="cal-today-btn" onclick="payThisMonth()">Este mês</button>
-    </div>
+  // Totals
+  const totalRec    = recurring.reduce((s, r) => s + (r.amount || 0), 0);
+  const paidRec     = recRows.filter(x => x.payDoc).reduce((s, x) => s + (x.rec.amount || 0), 0);
+  const totalOneOff = oneOffPayments.reduce((s, p) => s + (p.amount || 0), 0);
+  const totalPaid   = paidRec + oneOffPayments.filter(p => p.paid).reduce((s, p) => s + (p.amount || 0), 0);
+  const totalMonth  = totalRec + totalOneOff;
+
+  let html = `<div class="payments-view">`;
+
+  // Month navigation
+  html += `<div class="payments-month-nav">
+    <button class="month-nav-btn" onclick="shiftMonth(-1)"><i class="ti ti-chevron-left"></i></button>
+    <div class="month-nav-label">${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</div>
+    <button class="month-nav-btn" onclick="shiftMonth(1)"><i class="ti ti-chevron-right"></i></button>
   </div>`;
 
-  html += `<div class="pay-summary">
-    <div class="pay-sum-card">
-      <div class="pay-sum-val">${fmtBRL(total)}</div>
-      <div class="pay-sum-lbl">Total do mês</div>
-    </div>
-    <div class="pay-sum-card pay-sum-green">
-      <div class="pay-sum-val">${fmtBRL(paidAmt)}</div>
-      <div class="pay-sum-lbl">Pago</div>
-    </div>
-    <div class="pay-sum-card${pendAmt > 0 ? ' pay-sum-red' : ' pay-sum-green'}">
-      <div class="pay-sum-val">${fmtBRL(pendAmt)}</div>
-      <div class="pay-sum-lbl">Pendente</div>
-    </div>
+  // ── Recurring section ──
+  html += `<div class="payments-section-header">
+    <div class="payments-section-title"><i class="ti ti-repeat" style="margin-right:5px"></i>Despesas Fixas</div>
+    <button class="payments-section-action ${recurringEditMode ? 'active' : ''}" onclick="toggleRecurringEdit()">
+      <i class="ti ti-${recurringEditMode ? 'check' : 'settings-2'}"></i>
+      ${recurringEditMode ? 'Pronto' : 'Gerenciar'}
+    </button>
   </div>`;
 
-  if (!list.length) {
-    html += `<div class="empty"><i class="ti ti-receipt-off"></i>Nenhum pagamento para este mês.</div>`;
+  if (recurringEditMode) {
+    // Edit mode: show edit/delete buttons
+    if (recurring.length) {
+      html += recurring.map(r => `
+        <div class="rec-edit-row">
+          <div class="rec-name">${escHtml(r.name)}</div>
+          <div class="rec-amt">R$ ${fmtBRL(r.amount)}</div>
+          <button class="icon-btn-sm" onclick="editRecurring('${r._id}')" title="Editar"><i class="ti ti-pencil"></i></button>
+          <button class="icon-btn-sm" onclick="deleteRecurring('${r._id}')" title="Excluir"><i class="ti ti-trash"></i></button>
+        </div>`).join('');
+    } else {
+      html += `<div style="padding:14px 0;font-size:.83rem;color:var(--text3)">Nenhuma despesa fixa cadastrada.</div>`;
+    }
+    html += `<button class="pay-add-btn" onclick="openRecurringModal()">
+      <i class="ti ti-plus"></i> Nova despesa fixa
+    </button>`;
   } else {
-    html += `<div class="pay-list">`;
-    list.forEach(p => { html += paymentHtml(p); });
-    html += `</div>`;
+    // Check mode: show paid checkboxes
+    if (recRows.length) {
+      html += recRows.map(({ rec, payDoc }) => {
+        const paid = !!payDoc;
+        return `<div class="pay-row ${paid ? 'paid' : ''}">
+          <div class="pay-cb ${paid ? 'checked' : ''}" onclick="toggleRecurringPaid('${rec._id}','${payDoc?._id||''}')">
+            ${paid ? '<i class="ti ti-check" style="font-size:.7rem"></i>' : ''}
+          </div>
+          <div class="pay-row-body">
+            <div class="pay-row-desc">${escHtml(rec.name)}</div>
+          </div>
+          <div class="pay-row-amount">R$ ${fmtBRL(rec.amount)}</div>
+        </div>`;
+      }).join('');
+    } else {
+      html += `<div style="padding:14px 0;font-size:.83rem;color:var(--text3)">
+        Nenhuma despesa fixa. Clique em <strong>Gerenciar</strong> para adicionar.
+      </div>`;
+    }
+    if (recurring.length) {
+      html += `<div class="pay-summary">
+        <div class="pay-summary-label">Total fixas</div>
+        <div class="pay-summary-val">R$ ${fmtBRL(totalRec)}</div>
+      </div>`;
+    }
   }
 
-  html += `<div class="pay-actions-row">
-    <button class="btn-pay-secondary" onclick="copyPrevMonth()"><i class="ti ti-copy"></i> Copiar mês anterior</button>
-    <button class="btn-new" onclick="openPaymentModal()"><i class="ti ti-plus" aria-hidden="true"></i> Novo pagamento</button>
+  // ── One-off section ──
+  html += `<div class="payments-section-header" style="margin-top:20px">
+    <div class="payments-section-title"><i class="ti ti-receipt" style="margin-right:5px"></i>Pagamentos Avulsos</div>
   </div>`;
+
+  if (oneOffPayments.length) {
+    html += oneOffPayments.map(p => `
+      <div class="pay-row ${p.paid ? 'paid' : ''}">
+        <div class="pay-cb ${p.paid ? 'checked' : ''}" onclick="toggleOneOffPaid('${p._id}')">
+          ${p.paid ? '<i class="ti ti-check" style="font-size:.7rem"></i>' : ''}
+        </div>
+        <div class="pay-row-body">
+          <div class="pay-row-desc">${escHtml(p.description || p.desc || '')}</div>
+        </div>
+        <div class="pay-row-amount">R$ ${fmtBRL(p.amount)}</div>
+        <div class="pay-row-actions">
+          <button onclick="deletePayment('${p._id}')" title="Excluir"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>`).join('');
+  }
+
+  html += `<button class="pay-add-btn" onclick="openPaymentModal()">
+    <i class="ti ti-plus"></i> Adicionar pagamento avulso
+  </button>`;
+
+  // ── Monthly total ──
+  if (totalMonth > 0) {
+    html += `<div class="pay-summary" style="margin-top:16px;padding-top:16px;border-top-width:2px">
+      <div class="pay-summary-label">Total do mês</div>
+      <div class="pay-summary-val">R$ ${fmtBRL(totalMonth)}</div>
+    </div>`;
+  }
 
   html += `</div>`;
-  el.innerHTML = html;
+  listEl.innerHTML = html;
 }
 
-function paymentHtml(p) {
-  const s = dateStatus(p.dueDate);
-  const dateCls = s === 'overdue' ? 'date-overdue' : (s === 'today' || s === 'soon') ? 'date-soon' : 'date-normal';
-  const dateIcon = s === 'overdue' ? 'ti-alert-circle' : 'ti-calendar';
-  const dateLabel = p.dueDate ? fmtPayDate(p.dueDate) : '';
-  const dateBadge = p.dueDate
-    ? `<span class="pay-item-date ${dateCls}"><i class="ti ${dateIcon}" style="font-size:10px"></i> ${dateLabel}</span>`
-    : '';
-  return `<div class="pay-item${p.paid ? ' paid' : ''}">` +
-    `<div class="pay-item-check${p.paid ? ' checked' : ''}" onclick="togglePaymentPaid('${p._id}')" role="checkbox" aria-checked="${p.paid}" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter')togglePaymentPaid('${p._id}')">` +
-      (p.paid ? '<i class="ti ti-check" style="font-size:10px;color:var(--bg)"></i>' : '') +
-    `</div>` +
-    `<div class="pay-item-body"><div class="pay-item-desc">${esc(p.description)}</div></div>` +
-    dateBadge +
-    `<div class="pay-item-amount${p.paid ? ' paid-amount' : ''}">${fmtBRL(p.amount)}</div>` +
-    `<div class="task-actions">` +
-      `<button class="icon-btn" onclick="openPaymentModal('${p._id}')" aria-label="Editar"><i class="ti ti-edit"></i></button>` +
-      `<button class="icon-btn" onclick="deletePayment('${p._id}')" aria-label="Excluir"><i class="ti ti-trash"></i></button>` +
-    `</div>` +
-  `</div>`;
-}
-
-function fmtPayDate(d) {
-  if (!d) return '';
-  const [, m, dd] = d.split('-');
-  const months = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-  return `${dd} ${months[parseInt(m) - 1]}`;
-}
-
-window.payPrev = function () { payMonth--; if (payMonth < 0)  { payMonth = 11; payYear--; } renderPayments(); };
-window.payNext = function () { payMonth++; if (payMonth > 11) { payMonth = 0;  payYear++; } renderPayments(); };
-window.payThisMonth = function () { const d = new Date(); payYear = d.getFullYear(); payMonth = d.getMonth(); renderPayments(); };
-
-window.openPaymentModal = function (id) {
-  editPaymentId = id || null;
-  const p = id ? payments.find(x => x._id === id) : null;
-  document.getElementById('pay-modal-title').textContent = id ? 'Editar pagamento' : 'Novo pagamento';
-  document.getElementById('pay-modal-save-btn').querySelector('.btn-label').textContent = id ? 'Salvar' : 'Adicionar';
-  document.getElementById('pm-desc').value   = p ? (p.description || '') : '';
-  document.getElementById('pm-amount').value = p ? (p.amount  || '') : '';
-  document.getElementById('pm-date').value   = p ? (p.dueDate || '') : '';
-  document.getElementById('pay-modal-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('pm-desc').focus(), 100);
+window.shiftMonth = function(delta) {
+  payMonth += delta;
+  if (payMonth > 11) { payMonth = 0; payYear++; }
+  if (payMonth < 0)  { payMonth = 11; payYear--; }
+  renderPayments();
 };
 
-window.closePaymentModal = function () {
-  document.getElementById('pay-modal-overlay').classList.remove('open');
-  editPaymentId = null;
+window.toggleRecurringEdit = function() {
+  recurringEditMode = !recurringEditMode;
+  renderPayments();
 };
 
-window.handlePayModalOverlay = function (e) {
-  if (e.target.id === 'pay-modal-overlay') closePaymentModal();
-};
-
-window.savePaymentModal = async function () {
-  const description = document.getElementById('pm-desc').value.trim();
-  if (!description) { document.getElementById('pm-desc').focus(); return; }
-  const amount  = parseFloat(document.getElementById('pm-amount').value) || 0;
-  const dueDate = document.getElementById('pm-date').value;
-  const COL = getPayCol(); if (!COL) return;
-  const btn = document.getElementById('pay-modal-save-btn');
-  btn.classList.add('loading');
+window.toggleRecurringPaid = async function(recId, paymentId) {
+  const rec = recurring.find(x => x._id === recId);
+  if (!rec) return;
   const mStr = payMonthStr(payYear, payMonth);
-  const data = { description, amount, dueDate, month: mStr };
+  if (paymentId) {
+    await deleteDoc(userDoc('payments', paymentId));
+  } else {
+    await addDoc(userCol('payments'), {
+      description: rec.name, amount: rec.amount,
+      month: mStr, recurringId: recId, paid: true,
+      added: serverTimestamp(),
+    });
+  }
+};
+
+window.toggleOneOffPaid = async function(id) {
+  const p = payments.find(x => x._id === id);
+  if (!p) return;
+  await updateDoc(userDoc('payments', id), { paid: !p.paid });
+};
+
+window.deletePayment = async function(id) {
+  try { await deleteDoc(userDoc('payments', id)); }
+  catch(e) { showToast('Erro ao excluir'); }
+};
+
+// ─── Payment modal (one-off) ───────────────────────────────────
+function openPaymentModal(id) {
+  editingPaymentId = id || null;
+  const p = id ? payments.find(x => x._id === id) : null;
+  $('pay-modal-title').textContent = p ? 'Editar pagamento' : 'Novo pagamento';
+  $('pm-desc').value   = p ? (p.description || p.desc || '') : '';
+  $('pm-amount').value = p ? fmtBRL(p.amount) : '';
+  openOverlay('pay-modal-overlay');
+  setTimeout(() => $('pm-desc').focus(), 60);
+}
+
+window.openPaymentModal = openPaymentModal;
+
+window.savePaymentModal = async function() {
+  const desc = $('pm-desc').value.trim();
+  if (!desc) { $('pm-desc').focus(); return; }
+  const amount = parseBRL($('pm-amount').value);
+  const mStr   = payMonthStr(payYear, payMonth);
+  setLoading('pay-modal-save-btn', true);
   try {
-    if (editPaymentId) {
-      await updateDoc(doc(db, 'users', auth.currentUser.uid, 'payments', editPaymentId), data);
-      showToast('Pagamento atualizado');
+    if (editingPaymentId) {
+      await updateDoc(userDoc('payments', editingPaymentId), { description: desc, amount });
     } else {
-      data.paid = false; data.added = serverTimestamp();
-      await addDoc(COL, data);
-      showToast('Pagamento adicionado');
+      await addDoc(userCol('payments'), {
+        description: desc, amount, month: mStr, paid: false, added: serverTimestamp()
+      });
     }
     closePaymentModal();
-  } catch (e) {
-    console.error(e);
-    showToast('Erro ao salvar. Tente novamente.');
+  } catch(e) {
+    showToast('Erro ao salvar');
   } finally {
-    btn.classList.remove('loading');
+    setLoading('pay-modal-save-btn', false);
   }
 };
 
-window.togglePaymentPaid = async function (id) {
-  const p = payments.find(x => x._id === id); if (!p) return;
-  try {
-    await updateDoc(doc(db, 'users', auth.currentUser.uid, 'payments', id), { paid: !p.paid });
-  } catch (e) { showToast('Erro ao atualizar.'); }
+window.closePaymentModal = function() {
+  closeOverlay('pay-modal-overlay');
+  editingPaymentId = null;
 };
 
-window.deletePayment = async function (id) {
-  if (!confirm('Excluir este pagamento?')) return;
-  try {
-    await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'payments', id));
-    showToast('Pagamento excluído');
-  } catch (e) { showToast('Erro ao excluir.'); }
+window.handlePayModalOverlay = function(e) {
+  if (e.target === $('pay-modal-overlay')) closePaymentModal();
 };
 
-window.copyPrevMonth = async function () {
-  let prevY = payYear, prevM = payMonth - 1;
-  if (prevM < 0) { prevM = 11; prevY--; }
-  const prevList = payments.filter(p => p.month === payMonthStr(prevY, prevM));
-  if (!prevList.length) {
-    showToast(`Nenhum pagamento em ${CAL_MONTHS[prevM]}.`);
-    return;
+// ─── Recurring modal ───────────────────────────────────────────
+function openRecurringModal(id) {
+  editingRecId = id || null;
+  const r = id ? recurring.find(x => x._id === id) : null;
+  $('rec-modal-title').textContent = r ? 'Editar despesa fixa' : 'Nova despesa fixa';
+  $('rec-name').value   = r ? r.name   : '';
+  $('rec-amount').value = r ? fmtBRL(r.amount) : '';
+  openOverlay('rec-modal-overlay');
+  setTimeout(() => $('rec-name').focus(), 60);
+}
+
+window.openRecurringModal = openRecurringModal;
+
+window.editRecurring = function(id) { openRecurringModal(id); };
+
+window.saveRecurringModal = async function() {
+  const name = $('rec-name').value.trim();
+  if (!name) { $('rec-name').focus(); return; }
+  const amount = parseBRL($('rec-amount').value);
+  setLoading('rec-modal-save-btn', true);
+  try {
+    if (editingRecId) {
+      await updateDoc(userDoc('recurring', editingRecId), { name, amount });
+    } else {
+      await addDoc(userCol('recurring'), { name, amount, added: serverTimestamp() });
+    }
+    closeRecurringModal();
+  } catch(e) {
+    showToast('Erro ao salvar');
+  } finally {
+    setLoading('rec-modal-save-btn', false);
   }
-  if (!confirm(`Copiar ${prevList.length} pagamento(s) de ${CAL_MONTHS[prevM]} para ${CAL_MONTHS[payMonth]}?`)) return;
-  const COL = getPayCol(); if (!COL) return;
-  const mStr = payMonthStr(payYear, payMonth);
+};
+
+window.closeRecurringModal = function() {
+  closeOverlay('rec-modal-overlay');
+  editingRecId = null;
+};
+
+window.deleteRecurring = async function(id) {
+  try { await deleteDoc(userDoc('recurring', id)); }
+  catch(e) { showToast('Erro ao excluir'); }
+};
+
+// ─── List modal ────────────────────────────────────────────────
+window.openListModal = function(id) {
+  editingListId = id || null;
+  const l = id ? lists.find(x => x._id === id) : null;
+  $('list-modal-title').textContent = l ? 'Editar lista' : 'Nova lista';
+  selectedListEmoji = l ? (l.emoji || '📋') : '📋';
+  $('list-modal-name').value = l ? l.name : '';
+
+  document.querySelectorAll('.list-emoji-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.emoji === selectedListEmoji);
+  });
+
+  openOverlay('list-modal-overlay');
+  setTimeout(() => $('list-modal-name').focus(), 60);
+};
+
+window.editList = function(id) { openListModal(id); };
+
+window.selectListEmoji = function(btn) {
+  selectedListEmoji = btn.dataset.emoji;
+  document.querySelectorAll('.list-emoji-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+};
+
+window.saveList = async function() {
+  const name = $('list-modal-name').value.trim();
+  if (!name) { $('list-modal-name').focus(); return; }
+  setLoading('list-modal-save-btn', true);
   try {
-    await Promise.all(prevList.map(p => {
-      let newDate = '';
-      if (p.dueDate) {
-        const [, , dd] = p.dueDate.split('-').map(Number);
-        const lastDay = new Date(payYear, payMonth + 1, 0).getDate();
-        newDate = `${payYear}-${pad2(payMonth + 1)}-${pad2(Math.min(dd, lastDay))}`;
-      }
-      return addDoc(COL, { description: p.description, amount: p.amount, dueDate: newDate, month: mStr, paid: false, added: serverTimestamp() });
-    }));
-    showToast(`${prevList.length} pagamento(s) copiado(s)!`);
-  } catch (e) {
-    console.error(e);
-    showToast('Erro ao copiar pagamentos.');
+    if (editingListId) {
+      await updateDoc(userDoc('lists', editingListId), { name, emoji: selectedListEmoji });
+    } else {
+      await addDoc(userCol('lists'), { name, emoji: selectedListEmoji, added: serverTimestamp() });
+    }
+    closeListModal();
+  } catch(e) {
+    showToast('Erro ao salvar lista');
+  } finally {
+    setLoading('list-modal-save-btn', false);
   }
 };
 
+window.deleteList = async function(id) {
+  const lst = lists.find(x => x._id === id);
+  if (!lst) return;
+
+  if (!confirm(`Excluir lista "${lst.name}"? As tarefas da lista serão removidas.`)) return;
+
+  try {
+    const batch = writeBatch(db);
+    batch.delete(userDoc('lists', id));
+    tasks.filter(t => t.listId === id).forEach(t => batch.delete(userDoc('tasks', t._id)));
+    await batch.commit();
+    if (currentView === id) setView('pending');
+  } catch(e) {
+    showToast('Erro ao excluir lista');
+  }
+};
+
+window.closeListModal = function() {
+  closeOverlay('list-modal-overlay');
+  editingListId = null;
+};
+
+// ─── Modal helpers ─────────────────────────────────────────────
+function openOverlay(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeOverlay(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function setLoading(btnId, loading) {
+  document.getElementById(btnId).classList.toggle('loading', loading);
+}
+
+// ─── Theme ─────────────────────────────────────────────────────
+const themes = ['auto', 'light', 'dark'];
+let themeIdx = themes.indexOf(localStorage.getItem('birdy-theme') || 'auto');
+
+window.cycleTheme = function() {
+  themeIdx = (themeIdx + 1) % themes.length;
+  const t = themes[themeIdx];
+  localStorage.setItem('birdy-theme', t);
+  if (t === 'auto') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', t);
+  }
+  updateThemeIcon();
+};
+
+function updateThemeIcon() {
+  const t = themes[themeIdx];
+  const icons = { auto: 'ti-brightness-auto', light: 'ti-sun', dark: 'ti-moon' };
+  $('theme-icon').className = 'ti ' + (icons[t] || 'ti-brightness-auto');
+}
+
+updateThemeIcon();
+
+// ─── Keyboard shortcuts ────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    ['modal-overlay','pay-modal-overlay','rec-modal-overlay','list-modal-overlay'].forEach(id => {
+      document.getElementById(id).classList.remove('open');
+    });
+  }
+});
