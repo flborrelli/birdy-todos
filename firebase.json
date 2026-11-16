@@ -2,12 +2,13 @@
   "hosting": [
     {
       "target": "app",
-      "public": ".",
+      "public": "dist",
       "ignore": [
         "firebase.json",
         ".firebaserc",
         "**/.*"
       ],
+      "predeploy": ["npm run build"],
       "cleanUrls": true
     },
     {
