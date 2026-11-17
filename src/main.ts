@@ -11,14 +11,13 @@ import {
 } from 'firebase/firestore';
 
 import type {
-  Task, TaskList, Recurring, Payment, Filter, LayoutId, Layout,
+  Task, TaskList, Recurring, Payment, Filter, Layout,
   AppState, AppActions, Ctx, SyncInfo,
 } from './types';
 import {
   fmtBRL, maskBRL, parseBRL, payMonthStr, filterListId, escHtml,
   parseDueDay, dueDateFor, fmtDate, monthSummary,
 } from './util';
-import { mountB } from './layout-b';
 import { mountC } from './layout-c';
 
 // ─── Firebase ──────────────────────────────────────────────────
@@ -54,8 +53,7 @@ let editingPaymentId:  string | null = null;
 let editingRecId:      string | null = null;
 let editingMonthRecId: string | null = null;
 
-let layout:   Layout | null = null;
-let layoutId: LayoutId      = readLayoutId();
+let layout: Layout | null = null;
 
 // ─── Helpers ──────────────────────────────────────────────────
 function $<T extends HTMLElement>(id: string): T {
@@ -88,12 +86,7 @@ function setLoading(btnId: string, loading: boolean): void {
 function openOverlay(id: string): void  { document.getElementById(id)?.classList.add('open');    }
 function closeOverlay(id: string): void { document.getElementById(id)?.classList.remove('open'); }
 
-// ─── Layouts (B / C) ───────────────────────────────────────────
-function readLayoutId(): LayoutId {
-  try { return localStorage.getItem('birdy-layout') === 'c' ? 'c' : 'b'; }
-  catch { return 'b'; }
-}
-
+// ─── Layout ────────────────────────────────────────────────────
 function getState(): AppState {
   return {
     tasks, lists, recurring, payments,
@@ -133,9 +126,8 @@ function mountLayout(): void {
   layout?.destroy();
   const root = $<HTMLElement>('layout-root');
   root.innerHTML = '';
-  document.documentElement.dataset['layout'] = layoutId;
-  layout = (layoutId === 'b' ? mountB : mountC)(root, ctx);
-  syncLayoutSwitch();
+  document.documentElement.dataset['layout'] = 'c';
+  layout = mountC(root, ctx);
   renderAll();
 }
 
@@ -143,19 +135,6 @@ function unmountLayout(): void {
   layout?.destroy();
   layout = null;
   delete document.documentElement.dataset['layout'];
-}
-
-function setLayout(id: LayoutId): void {
-  layoutId = id;
-  try { localStorage.setItem('birdy-layout', id); } catch { /* localStorage indisponível */ }
-  if (auth.currentUser) mountLayout();
-  else syncLayoutSwitch();
-}
-
-function syncLayoutSwitch(): void {
-  document.querySelectorAll<HTMLElement>('[data-layout-btn]').forEach(b => {
-    b.classList.toggle('on', b.dataset['layoutBtn'] === layoutId);
-  });
 }
 
 function renderAll(): void {
@@ -190,14 +169,12 @@ onAuthStateChanged(auth, (user: User | null) => {
     $<HTMLElement>('login-screen').style.display  = 'none';
     $<HTMLElement>('main-app').style.display      = 'block';
     $<HTMLElement>('fab').style.display           = 'flex';
-    $<HTMLElement>('layout-switch').style.display = 'flex';
     mountLayout();
     startListening();
   } else {
     $<HTMLElement>('login-screen').style.display  = 'flex';
     $<HTMLElement>('main-app').style.display     = 'none';
     $<HTMLElement>('fab').style.display          = 'none';
-    $<HTMLElement>('layout-switch').style.display = 'none';
     unmountLayout();
     tasks = []; lists = []; recurring = []; payments = [];
   }
@@ -676,8 +653,7 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
 
 // ─── Expose to HTML onclick handlers ──────────────────────────
 type WindowExtensions = {
-  setLayout:             (id: LayoutId) => void;
-  fabAction:             () => void;
+  fabAction:            () => void;
   saveModal:             () => void;
   closeModal:            () => void;
   handleOverlayClick:    (e: MouseEvent) => void;
@@ -698,7 +674,6 @@ type WindowExtensions = {
 };
 
 Object.assign(window, {
-  setLayout,
   fabAction,
   saveModal,
   closeModal,
@@ -718,5 +693,3 @@ Object.assign(window, {
   closeMonthModal,
   resetMonthOverride,
 } satisfies WindowExtensions);
-
-syncLayoutSwitch();

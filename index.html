@@ -25,7 +25,7 @@
   <link rel="stylesheet" href="/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Mono:wght@500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Mono:wght@500&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
   <script>(function(){var t=localStorage.getItem('birdy-theme');if(t&&t!=='auto')document.documentElement.setAttribute('data-theme',t)})();</script>
 </head>
@@ -83,17 +83,11 @@
   </div>
 </div>
 
-<!-- App principal: o layout (B ou C) é montado aqui por src/main.ts -->
+<!-- App principal: o layout é montado aqui por src/main.ts -->
 <div class="app-root" id="main-app" style="display:none">
   <div id="layout-root"></div>
 </div>
 
-<!-- Seletor temporário de layout (testar B x C) -->
-<div class="layout-switch" id="layout-switch" style="display:none" role="group" aria-label="Testar layout">
-  <span class="layout-switch-label">Layout</span>
-  <button type="button" data-layout-btn="b" onclick="setLayout('b')">B · Painel</button>
-  <button type="button" data-layout-btn="c" onclick="setLayout('c')">C · Passarinho</button>
-</div>
 <!-- FAB (mobile) -->
 <button class="fab" onclick="fabAction()" aria-label="Nova pendência" id="fab" style="display:none">
   <i class="ti ti-plus" aria-hidden="true"></i>

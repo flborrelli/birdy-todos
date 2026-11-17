@@ -643,29 +643,8 @@ html, body {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* ─── Seletor de layout (temporário: testar B x C) ──────────── */
+/* ─── App ──────────────────────────────────────────────────── */
 .app-root { min-height: 100dvh; }
-.layout-switch {
-  position: fixed; left: 14px; bottom: 14px; z-index: 150;
-  display: flex; align-items: center; gap: 4px; padding: 4px;
-  border-radius: 999px; background: rgba(20,20,24,.92); color: #fff;
-  box-shadow: 0 6px 24px rgba(0,0,0,.35); backdrop-filter: blur(8px);
-  font: 600 12px/1 var(--font);
-}
-.layout-switch-label {
-  padding: 0 8px 0 12px; opacity: .55; font-size: 10px;
-  text-transform: uppercase; letter-spacing: .1em;
-}
-.layout-switch button {
-  border: 0; background: transparent; color: #cfcfd6; cursor: pointer;
-  padding: 8px 13px; border-radius: 999px; font: inherit;
-}
-.layout-switch button:hover { color: #fff; }
-.layout-switch button.on { background: #fff; color: #111; }
-@media (max-width: 768px) {
-  .layout-switch { left: 12px; bottom: 12px; }
-  .layout-switch-label { display: none; }
-}
 
 /* ─── Utilities ────────────────────────────────────────────── */
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }

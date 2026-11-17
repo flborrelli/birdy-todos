@@ -35,7 +35,6 @@ export interface Payment {
 
 // 'all' = todas · 'none' = sem lista · qualquer outro valor = id de uma lista
 export type Filter = string;
-export type LayoutId = 'b' | 'c';
 
 export interface SyncInfo {
   state: 'syncing' | 'ok' | 'error';
