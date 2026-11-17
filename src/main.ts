@@ -6,9 +6,20 @@ import {
 import {
   getFirestore,
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
-  doc, serverTimestamp, writeBatch,
+  doc, serverTimestamp, writeBatch, deleteField,
   type CollectionReference, type DocumentData,
 } from 'firebase/firestore';
+
+import type {
+  Task, TaskList, Recurring, Payment, Filter, LayoutId, Layout,
+  AppState, AppActions, Ctx, SyncInfo,
+} from './types';
+import {
+  fmtBRL, maskBRL, parseBRL, payMonthStr, filterListId, escHtml,
+  parseDueDay, dueDateFor, fmtDate, monthSummary,
+} from './util';
+import { mountB } from './layout-b';
+import { mountC } from './layout-c';
 
 // ─── Firebase ──────────────────────────────────────────────────
 const firebaseConfig = {
@@ -24,46 +35,15 @@ const fbApp = initializeApp(firebaseConfig);
 const auth  = getAuth(fbApp);
 const db    = getFirestore(fbApp);
 
-// ─── Domain types ──────────────────────────────────────────────
-interface Task {
-  _id:    string;
-  title:  string;
-  note?:  string;
-  done:   boolean;
-  doneAt: number | null;
-  listId?: string;
-}
-
-interface TaskList {
-  _id:   string;
-  name:  string;
-  emoji: string;
-}
-
-interface Recurring {
-  _id:    string;
-  name:   string;
-  amount: number;
-}
-
-interface Payment {
-  _id:         string;
-  description: string;
-  amount:      number;
-  month:       string;
-  paid:        boolean;
-  recurringId?: string;
-}
-
-type View = 'pending' | 'payments' | string; // string = list id
-
 // ─── State ────────────────────────────────────────────────────
 let tasks:     Task[]      = [];
 let lists:     TaskList[]  = [];
 let recurring: Recurring[] = [];
 let payments:  Payment[]   = [];
 
-let currentView:       View    = 'pending';
+let filter:            Filter  = 'all';
+let sync:              SyncInfo = { state: 'syncing', label: 'Conectando…' };
+let userInfo                   = { name: '', photo: '' };
 let unsubs:            Array<() => void> = [];
 let payYear:           number  = new Date().getFullYear();
 let payMonth:          number  = new Date().getMonth();
@@ -72,8 +52,12 @@ let selectedListEmoji: string  = '📋';
 let editingListId:     string | null = null;
 let editingPaymentId:  string | null = null;
 let editingRecId:      string | null = null;
+let editingMonthRecId: string | null = null;
 
-// ─── DOM helpers ──────────────────────────────────────────────
+let layout:   Layout | null = null;
+let layoutId: LayoutId      = readLayoutId();
+
+// ─── Helpers ──────────────────────────────────────────────────
 function $<T extends HTMLElement>(id: string): T {
   return document.getElementById(id) as T;
 }
@@ -88,33 +72,6 @@ function userDoc(col: string, id: string) {
   return doc(db, 'users', uid, col, id);
 }
 
-function payMonthStr(y: number, m: number): string {
-  return `${y}-${String(m + 1).padStart(2, '0')}`;
-}
-
-function fmtBRL(n: number | undefined | null): string {
-  if (n == null) return '—';
-  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function maskBRL(input: HTMLInputElement): void {
-  const v = input.value.replace(/\D/g, '');
-  if (!v) { input.value = ''; return; }
-  const n = parseInt(v, 10) / 100;
-  input.value = n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function parseBRL(str: string): number {
-  if (!str) return 0;
-  return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
-}
-
-function escHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 function showToast(msg: string, dur = 2200): void {
   const t = $<HTMLElement>('toast');
@@ -124,17 +81,93 @@ function showToast(msg: string, dur = 2200): void {
   toastTimer = setTimeout(() => t.classList.remove('show'), dur);
 }
 
-function setSyncState(state: string, label: string): void {
-  $<HTMLElement>('sync-dot').className  = 'sync-dot ' + state;
-  $<HTMLElement>('sync-label').textContent = label;
-}
-
 function setLoading(btnId: string, loading: boolean): void {
   document.getElementById(btnId)?.classList.toggle('loading', loading);
 }
 
 function openOverlay(id: string): void  { document.getElementById(id)?.classList.add('open');    }
 function closeOverlay(id: string): void { document.getElementById(id)?.classList.remove('open'); }
+
+// ─── Layouts (B / C) ───────────────────────────────────────────
+function readLayoutId(): LayoutId {
+  try { return localStorage.getItem('birdy-layout') === 'c' ? 'c' : 'b'; }
+  catch { return 'b'; }
+}
+
+function getState(): AppState {
+  return {
+    tasks, lists, recurring, payments,
+    filter, payYear, payMonth,
+    manageRecurring: recurringEditMode,
+    user: userInfo,
+    sync,
+  };
+}
+
+const actions: AppActions = {
+  setFilter:           f => { filter = f; renderAll(); },
+  toggleDone:          id => { void toggleDone(id); },
+  deleteTask:          id => { void deleteTask(id); },
+  addTask,
+  toggleRecurringPaid: (recId, paymentId) => { void toggleRecurringPaid(recId, paymentId); },
+  toggleOneOffPaid:    id => { void toggleOneOffPaid(id); },
+  deletePayment:       id => { void deletePayment(id); },
+  addOneOffPayment,
+  shiftMonth,
+  toggleManage:        () => { recurringEditMode = !recurringEditMode; renderAll(); },
+  openTaskModal,
+  openPaymentModal,
+  openRecurringModal,
+  openMonthModal,
+  deleteRecurring:     id => { void deleteRecurring(id); },
+  openListModal,
+  deleteList:          id => { void deleteList(id); },
+  cycleTheme,
+  logout:              () => { void doLogout(); },
+  toast:               msg => showToast(msg),
+};
+
+const ctx: Ctx = { state: getState, actions };
+
+function mountLayout(): void {
+  layout?.destroy();
+  const root = $<HTMLElement>('layout-root');
+  root.innerHTML = '';
+  document.documentElement.dataset['layout'] = layoutId;
+  layout = (layoutId === 'b' ? mountB : mountC)(root, ctx);
+  syncLayoutSwitch();
+  renderAll();
+}
+
+function unmountLayout(): void {
+  layout?.destroy();
+  layout = null;
+  delete document.documentElement.dataset['layout'];
+}
+
+function setLayout(id: LayoutId): void {
+  layoutId = id;
+  try { localStorage.setItem('birdy-layout', id); } catch { /* localStorage indisponível */ }
+  if (auth.currentUser) mountLayout();
+  else syncLayoutSwitch();
+}
+
+function syncLayoutSwitch(): void {
+  document.querySelectorAll<HTMLElement>('[data-layout-btn]').forEach(b => {
+    b.classList.toggle('on', b.dataset['layoutBtn'] === layoutId);
+  });
+}
+
+function renderAll(): void {
+  if (filter !== 'all' && filter !== 'none' && !lists.some(l => l._id === filter)) filter = 'all';
+  layout?.update();
+  updateThemeIcon();
+}
+
+function setSyncState(state: SyncInfo['state'], label: string): void {
+  sync = { state, label };
+  renderAll();
+}
 
 // ─── Auth ──────────────────────────────────────────────────────
 $<HTMLButtonElement>('btn-google-login').addEventListener('click', async () => {
@@ -153,27 +186,22 @@ async function doLogout(): Promise<void> {
 
 onAuthStateChanged(auth, (user: User | null) => {
   if (user) {
-    $<HTMLElement>('login-screen').style.display = 'none';
-    $<HTMLElement>('main-app').style.display     = 'flex';
-    $<HTMLElement>('fab').style.display          = 'flex';
-    ($<HTMLImageElement>('user-avatar')).src     = user.photoURL ?? '';
-    $<HTMLElement>('user-name').textContent      = user.displayName ?? user.email ?? '';
-    updateDateLabel();
+    userInfo = { name: user.displayName ?? user.email ?? '', photo: user.photoURL ?? '' };
+    $<HTMLElement>('login-screen').style.display  = 'none';
+    $<HTMLElement>('main-app').style.display      = 'block';
+    $<HTMLElement>('fab').style.display           = 'flex';
+    $<HTMLElement>('layout-switch').style.display = 'flex';
+    mountLayout();
     startListening();
   } else {
-    $<HTMLElement>('login-screen').style.display = 'flex';
+    $<HTMLElement>('login-screen').style.display  = 'flex';
     $<HTMLElement>('main-app').style.display     = 'none';
     $<HTMLElement>('fab').style.display          = 'none';
+    $<HTMLElement>('layout-switch').style.display = 'none';
+    unmountLayout();
     tasks = []; lists = []; recurring = []; payments = [];
   }
 });
-
-function updateDateLabel(): void {
-  const d = new Date();
-  $<HTMLElement>('date-label').textContent = d.toLocaleDateString('pt-BR', {
-    weekday: 'long', day: 'numeric', month: 'long',
-  });
-}
 
 // ─── Firestore listeners ───────────────────────────────────────
 function startListening(): void {
@@ -182,7 +210,6 @@ function startListening(): void {
   const u1 = onSnapshot(userCol('tasks'), snap => {
     tasks = snap.docs.map(d => ({ _id: d.id, ...(d.data() as Omit<Task, '_id'>) }));
     autoDeleteOldCompleted();
-    renderAll();
     setSyncState('ok', 'Sincronizado');
   }, () => setSyncState('error', 'Erro de conexão'));
 
@@ -194,7 +221,7 @@ function startListening(): void {
   const u3 = onSnapshot(userCol('recurring'), snap => {
     recurring = snap.docs.map(d => ({ _id: d.id, ...(d.data() as Omit<Recurring, '_id'>) }));
     renderAll();
-  });
+  }, () => showToast('Despesas fixas indisponíveis: publique as regras do Firestore', 6000));
 
   const u4 = onSnapshot(userCol('payments'), snap => {
     payments = snap.docs.map(d => ({ _id: d.id, ...(d.data() as Omit<Payment, '_id'>) }));
@@ -215,153 +242,8 @@ function autoDeleteOldCompleted(): void {
   batch.commit().catch(err => console.error('Auto-delete error:', err));
 }
 
-// ─── Render orchestrator ───────────────────────────────────────
-function renderAll(): void {
-  renderStats();
-  renderListsNav();
-  if (currentView === 'payments') {
-    renderPayments();
-  } else {
-    renderTaskList();
-  }
-}
-
-function renderStats(): void {
-  const pending   = tasks.filter(t => !t.done).length;
-  const doneToday = tasks.filter(t => {
-    if (!t.done || !t.doneAt) return false;
-    return new Date(t.doneAt).toDateString() === new Date().toDateString();
-  }).length;
-
-  $<HTMLElement>('stats').innerHTML = `
-    <div class="stat-box accent">
-      <div class="stat-num">${pending}</div>
-      <div class="stat-label">Pendentes</div>
-    </div>
-    <div class="stat-box green">
-      <div class="stat-num">${doneToday}</div>
-      <div class="stat-label">Feitas hoje</div>
-    </div>`;
-}
-
-// ─── Lists nav ─────────────────────────────────────────────────
-function renderListsNav(): void {
-  const nav = $<HTMLElement>('lists-nav');
-  if (!lists.length) { nav.innerHTML = ''; return; }
-  nav.innerHTML = lists.map(l => {
-    const count  = tasks.filter(t => !t.done && t.listId === l._id).length;
-    const active = currentView === l._id ? ' active' : '';
-    return `<button class="list-nav-item${active}" onclick="setView('${l._id}')">
-      <span>${escHtml(l.emoji ?? '📋')}</span>
-      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(l.name)}</span>
-      <span class="list-nav-badge">${count || ''}</span>
-      <span class="list-nav-actions">
-        <button class="icon-btn-sm" onclick="event.stopPropagation();editList('${l._id}')" title="Editar"><i class="ti ti-pencil"></i></button>
-        <button class="icon-btn-sm" onclick="event.stopPropagation();deleteList('${l._id}')" title="Excluir"><i class="ti ti-trash"></i></button>
-      </span>
-    </button>`;
-  }).join('');
-}
-
-// ─── View switching ────────────────────────────────────────────
-function isListView(): boolean {
-  return currentView !== 'pending' && currentView !== 'payments';
-}
-
-function setView(view: View): void {
-  currentView      = view;
-  recurringEditMode = false;
-
-  $<HTMLButtonElement>('tab-pending').classList.toggle('active', view === 'pending' || isListView());
-  $<HTMLButtonElement>('tab-payments').classList.toggle('active', view === 'payments');
-  $<HTMLElement>('quick-add').style.display = view === 'payments' ? 'none' : '';
-
-  renderAll();
-}
-
-// ─── Task list render ──────────────────────────────────────────
-function renderTaskList(): void {
-  const hdr    = $<HTMLElement>('list-view-header');
-  const listEl = $<HTMLElement>('list');
-
-  let viewTasks: Task[] = [];
-  if (currentView === 'pending') {
-    hdr.style.display = 'none';
-    viewTasks = tasks.filter(t => !t.listId);
-  } else {
-    const lst = lists.find(l => l._id === currentView);
-    hdr.style.display = lst ? 'flex' : 'none';
-    if (lst) {
-      hdr.innerHTML = `
-        <button class="view-back-btn" onclick="setView('pending')" title="Voltar"><i class="ti ti-arrow-left"></i></button>
-        <div class="view-title">${escHtml(lst.emoji ?? '📋')} ${escHtml(lst.name)}</div>`;
-    }
-    viewTasks = tasks.filter(t => t.listId === currentView);
-  }
-
-  const pending = viewTasks.filter(t => !t.done);
-  const done    = viewTasks.filter(t => t.done);
-
-  if (!viewTasks.length) {
-    listEl.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">📝</div>
-      Nada aqui ainda.<br>Adicione sua primeira pendência acima.
-    </div>`;
-    return;
-  }
-
-  let html = pending.map(taskRowHtml).join('');
-  if (done.length) {
-    html += `<div class="done-notice"><i class="ti ti-clock-hour-4"></i> Concluídas · serão removidas em 24h</div>`;
-    html += done.map(taskRowHtml).join('');
-  }
-  listEl.innerHTML = html;
-}
-
-function taskRowHtml(t: Task): string {
-  const noteHtml = t.note ? `<div class="task-row-note">${escHtml(t.note)}</div>` : '';
-  return `<div class="task-row${t.done ? ' done' : ''}" data-id="${t._id}">
-    <div class="task-cb${t.done ? ' checked' : ''}" onclick="toggleDone('${t._id}')">
-      ${t.done ? '<i class="ti ti-check" style="font-size:.7rem"></i>' : ''}
-    </div>
-    <div class="task-row-body">
-      <div class="task-row-title">${escHtml(t.title)}</div>
-      ${noteHtml}
-    </div>
-    <div class="task-row-actions">
-      <button onclick="deleteTask('${t._id}')" title="Excluir"><i class="ti ti-trash"></i></button>
-    </div>
-  </div>`;
-}
-
-// ─── Quick-add ─────────────────────────────────────────────────
-$<HTMLInputElement>('qa-input').addEventListener('keydown', (e: KeyboardEvent) => {
-  if (e.key === 'Enter') { e.preventDefault(); quickAdd(); }
-  if (e.key === 'Tab')   { e.preventDefault(); toggleQaNoteRow(); }
-});
-
-function toggleQaNoteRow(): void {
-  const nr   = $<HTMLElement>('qa-note-row');
-  const open = nr.classList.toggle('open');
-  if (open) setTimeout(() => $<HTMLTextAreaElement>('qa-note').focus(), 50);
-}
-
-function closeQaNote(): void {
-  $<HTMLElement>('qa-note-row').classList.remove('open');
-  $<HTMLTextAreaElement>('qa-note').value = '';
-  $<HTMLInputElement>('qa-input').focus();
-}
-
-async function quickAdd(): Promise<void> {
-  const title = $<HTMLInputElement>('qa-input').value.trim();
-  if (!title) { $<HTMLInputElement>('qa-input').focus(); return; }
-  const note   = $<HTMLTextAreaElement>('qa-note').value.trim();
-  const listId = isListView() ? currentView : null;
-
-  $<HTMLInputElement>('qa-input').value     = '';
-  $<HTMLTextAreaElement>('qa-note').value   = '';
-  $<HTMLElement>('qa-note-row').classList.remove('open');
-
+// ─── Task CRUD ─────────────────────────────────────────────────
+async function addTask(title: string, note: string, listId: string | null): Promise<void> {
   try {
     const data: Record<string, unknown> = {
       title, done: false, doneAt: null, added: serverTimestamp(),
@@ -374,7 +256,6 @@ async function quickAdd(): Promise<void> {
   }
 }
 
-// ─── Task CRUD ─────────────────────────────────────────────────
 async function toggleDone(id: string): Promise<void> {
   const t = tasks.find(x => x._id === id);
   if (!t) return;
@@ -391,9 +272,10 @@ async function deleteTask(id: string): Promise<void> {
   catch { showToast('Erro ao excluir'); }
 }
 
-// ─── Task modal (mobile FAB) ───────────────────────────────────
+// ─── Task modal (FAB / mobile) ─────────────────────────────────
+// Na tela de Pagamentos o (+) cria um pagamento; nas demais, uma pendência.
 function fabAction(): void {
-  if (currentView === 'payments') openPaymentModal();
+  if (layout?.getView() === 'pay') openPaymentModal();
   else openTaskModal();
 }
 
@@ -408,7 +290,7 @@ function openTaskModal(): void {
     sel.style.display = '';
     sel.innerHTML = `<option value="">Sem lista</option>` +
       lists.map(l => `<option value="${l._id}">${escHtml(l.emoji ?? '')} ${escHtml(l.name)}</option>`).join('');
-    sel.value = isListView() ? currentView : '';
+    sel.value = filterListId(filter) ?? '';
   } else {
     sel.style.display = 'none';
   }
@@ -440,154 +322,91 @@ async function saveModal(): Promise<void> {
 
 function closeModal(): void { closeOverlay('modal-overlay'); }
 
-// ─── Payments view ─────────────────────────────────────────────
-function renderPayments(): void {
-  $<HTMLElement>('list-view-header').style.display = 'none';
-  const listEl = $<HTMLElement>('list');
-  const mStr   = payMonthStr(payYear, payMonth);
-
-  const monthLabel = new Date(payYear, payMonth, 1)
-    .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-
-  type RecRow = { rec: Recurring; payDoc: Payment | undefined };
-  const recRows: RecRow[] = recurring.map(r => ({
-    rec: r,
-    payDoc: payments.find(p => p.recurringId === r._id && p.month === mStr),
-  }));
-
-  const oneOffPayments = payments.filter(p => !p.recurringId && p.month === mStr);
-
-  const totalRec    = recurring.reduce((s, r) => s + (r.amount ?? 0), 0);
-  const totalOneOff = oneOffPayments.reduce((s, p) => s + (p.amount ?? 0), 0);
-  const totalMonth  = totalRec + totalOneOff;
-
-  let html = `<div class="payments-view">`;
-
-  html += `<div class="payments-month-nav">
-    <button class="month-nav-btn" onclick="shiftMonth(-1)"><i class="ti ti-chevron-left"></i></button>
-    <div class="month-nav-label">${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</div>
-    <button class="month-nav-btn" onclick="shiftMonth(1)"><i class="ti ti-chevron-right"></i></button>
-  </div>`;
-
-  // ── Recurring ──
-  html += `<div class="payments-section-header">
-    <div class="payments-section-title"><i class="ti ti-repeat" style="margin-right:5px"></i>Despesas Fixas</div>
-    <button class="payments-section-action ${recurringEditMode ? 'active' : ''}" onclick="toggleRecurringEdit()">
-      <i class="ti ti-${recurringEditMode ? 'check' : 'settings-2'}"></i>
-      ${recurringEditMode ? 'Pronto' : 'Gerenciar'}
-    </button>
-  </div>`;
-
-  if (recurringEditMode) {
-    if (recurring.length) {
-      html += recurring.map(r => `
-        <div class="rec-edit-row">
-          <div class="rec-name">${escHtml(r.name)}</div>
-          <div class="rec-amt">R$ ${fmtBRL(r.amount)}</div>
-          <button class="icon-btn-sm" onclick="editRecurring('${r._id}')"><i class="ti ti-pencil"></i></button>
-          <button class="icon-btn-sm" onclick="deleteRecurring('${r._id}')"><i class="ti ti-trash"></i></button>
-        </div>`).join('');
-    } else {
-      html += `<div style="padding:14px 0;font-size:.83rem;color:var(--text3)">Nenhuma despesa fixa cadastrada.</div>`;
-    }
-    html += `<button class="pay-add-btn" onclick="openRecurringModal()">
-      <i class="ti ti-plus"></i> Nova despesa fixa
-    </button>`;
-  } else {
-    if (recRows.length) {
-      html += recRows.map(({ rec, payDoc }) => {
-        const paid = !!payDoc;
-        return `<div class="pay-row ${paid ? 'paid' : ''}">
-          <div class="pay-cb ${paid ? 'checked' : ''}" onclick="toggleRecurringPaid('${rec._id}','${payDoc?._id ?? ''}')">
-            ${paid ? '<i class="ti ti-check" style="font-size:.7rem"></i>' : ''}
-          </div>
-          <div class="pay-row-body"><div class="pay-row-desc">${escHtml(rec.name)}</div></div>
-          <div class="pay-row-amount">R$ ${fmtBRL(rec.amount)}</div>
-        </div>`;
-      }).join('');
-    } else {
-      html += `<div style="padding:14px 0;font-size:.83rem;color:var(--text3)">
-        Nenhuma despesa fixa. Clique em <strong>Gerenciar</strong> para adicionar.
-      </div>`;
-    }
-    if (recurring.length) {
-      html += `<div class="pay-summary">
-        <div class="pay-summary-label">Total fixas</div>
-        <div class="pay-summary-val">R$ ${fmtBRL(totalRec)}</div>
-      </div>`;
-    }
-  }
-
-  // ── One-off ──
-  html += `<div class="payments-section-header" style="margin-top:20px">
-    <div class="payments-section-title"><i class="ti ti-receipt" style="margin-right:5px"></i>Pagamentos Avulsos</div>
-  </div>`;
-
-  if (oneOffPayments.length) {
-    html += oneOffPayments.map(p => `
-      <div class="pay-row ${p.paid ? 'paid' : ''}">
-        <div class="pay-cb ${p.paid ? 'checked' : ''}" onclick="toggleOneOffPaid('${p._id}')">
-          ${p.paid ? '<i class="ti ti-check" style="font-size:.7rem"></i>' : ''}
-        </div>
-        <div class="pay-row-body"><div class="pay-row-desc">${escHtml(p.description)}</div></div>
-        <div class="pay-row-amount">R$ ${fmtBRL(p.amount)}</div>
-        <div class="pay-row-actions">
-          <button onclick="deletePayment('${p._id}')"><i class="ti ti-trash"></i></button>
-        </div>
-      </div>`).join('');
-  }
-
-  html += `<button class="pay-add-btn" onclick="openPaymentModal()">
-    <i class="ti ti-plus"></i> Adicionar pagamento avulso
-  </button>`;
-
-  if (totalMonth > 0) {
-    html += `<div class="pay-summary" style="margin-top:16px;border-top-width:2px">
-      <div class="pay-summary-label">Total do mês</div>
-      <div class="pay-summary-val">R$ ${fmtBRL(totalMonth)}</div>
-    </div>`;
-  }
-
-  html += `</div>`;
-  listEl.innerHTML = html;
-}
-
+// ─── Payments ──────────────────────────────────────────────────
 function shiftMonth(delta: number): void {
   payMonth += delta;
   if (payMonth > 11) { payMonth = 0; payYear++; }
   if (payMonth < 0)  { payMonth = 11; payYear--; }
-  renderPayments();
+  renderAll();
 }
 
-function toggleRecurringEdit(): void {
-  recurringEditMode = !recurringEditMode;
-  renderPayments();
-}
-
+// O documento do mês é mantido ao desmarcar, para não perder ajustes de valor/vencimento.
 async function toggleRecurringPaid(recId: string, paymentId: string): Promise<void> {
   const rec  = recurring.find(x => x._id === recId);
   if (!rec) return;
   const mStr = payMonthStr(payYear, payMonth);
-  if (paymentId) {
-    await deleteDoc(userDoc('payments', paymentId));
-  } else {
-    await addDoc(userCol('payments'), {
-      description: rec.name, amount: rec.amount,
-      month: mStr, recurringId: recId, paid: true,
-      added: serverTimestamp(),
-    });
-  }
+  const row  = monthSummary(getState()).rows.find(r => r.kind === 'rec' && r.id === recId);
+  if (row?.estimated) { openMonthModal(recId); return; }
+  const docu = payments.find(p => p._id === paymentId)
+            ?? payments.find(p => p.recurringId === recId && p.month === mStr);
+  try {
+    if (docu) {
+      await updateDoc(userDoc('payments', docu._id), { paid: !docu.paid });
+    } else {
+      const data: Record<string, unknown> = {
+        description: rec.name, amount: row?.amount ?? rec.amount ?? 0,
+        month: mStr, recurringId: recId, paid: true,
+        added: serverTimestamp(),
+      };
+      if (rec.dueDay) data['dueDay'] = rec.dueDay;
+      await addDoc(userCol('payments'), data);
+    }
+  } catch { showToast('Erro ao atualizar'); }
 }
 
 async function toggleOneOffPaid(id: string): Promise<void> {
   const p = payments.find(x => x._id === id);
   if (!p) return;
-  await updateDoc(userDoc('payments', id), { paid: !p.paid });
+  try { await updateDoc(userDoc('payments', id), { paid: !p.paid }); }
+  catch { showToast('Erro ao atualizar'); }
 }
 
 async function deletePayment(id: string): Promise<void> {
   try { await deleteDoc(userDoc('payments', id)); }
   catch { showToast('Erro ao excluir'); }
+}
+
+async function addOneOffPayment(description: string, amount: number, dueDay: number): Promise<void> {
+  try {
+    await addDoc(userCol('payments'), {
+      description, amount, dueDay, month: payMonthStr(payYear, payMonth), paid: false, added: serverTimestamp(),
+    });
+  } catch { showToast('Erro ao adicionar'); }
+}
+
+// ─── Dia de vencimento (modais) ────────────────────────────────
+function readDueDay(inputId: string): number | null {
+  return parseDueDay($<HTMLInputElement>(inputId).value);
+}
+
+function updateDueHint(kind: 'rec' | 'pay' | 'mo'): void {
+  const day  = readDueDay(kind === 'rec' ? 'rec-due' : kind === 'pay' ? 'pm-due' : 'mo-due');
+  const hint = $<HTMLElement>(kind === 'rec' ? 'rec-due-hint' : kind === 'pay' ? 'pm-due-hint' : 'mo-due-hint');
+  if (!day) {
+    hint.textContent = kind === 'rec' ? 'Opcional. Em branco = você define o vencimento em cada mês.'
+      : kind === 'mo' ? 'Dia do vencimento neste mês (1 a 31). Em branco = mantém o padrão.'
+      : 'Dia do mês em que a conta vence (1 a 31).';
+    return;
+  }
+  if (kind === 'rec') {
+    hint.textContent = day > 28
+      ? `Vence todo dia ${day} (em meses mais curtos, vale o último dia).`
+      : `Vence todo dia ${day}.`;
+    return;
+  }
+  let y = payYear, m = payMonth;
+  const p = kind === 'pay' && editingPaymentId ? payments.find(x => x._id === editingPaymentId) : null;
+  if (p) { const [py, pm] = p.month.split('-').map(Number); y = py!; m = pm! - 1; }
+  hint.textContent = `Vence em ${fmtDate(dueDateFor(y, m, day))}.`;
+}
+
+function requireDueDay(inputId: string): number | null {
+  const day = readDueDay(inputId);
+  if (day == null) {
+    showToast('Informe o dia do vencimento (1 a 31)');
+    $<HTMLInputElement>(inputId).focus();
+  }
+  return day;
 }
 
 // ─── Payment modal ─────────────────────────────────────────────
@@ -597,6 +416,8 @@ function openPaymentModal(id?: string): void {
   $<HTMLElement>('pay-modal-title').textContent = p ? 'Editar pagamento' : 'Novo pagamento';
   $<HTMLInputElement>('pm-desc').value   = p?.description ?? '';
   $<HTMLInputElement>('pm-amount').value = p ? fmtBRL(p.amount) : '';
+  $<HTMLInputElement>('pm-due').value    = p?.dueDay ? String(p.dueDay) : '';
+  updateDueHint('pay');
   openOverlay('pay-modal-overlay');
   setTimeout(() => $<HTMLInputElement>('pm-desc').focus(), 60);
 }
@@ -605,14 +426,16 @@ async function savePaymentModal(): Promise<void> {
   const desc = $<HTMLInputElement>('pm-desc').value.trim();
   if (!desc) { $<HTMLInputElement>('pm-desc').focus(); return; }
   const amount = parseBRL($<HTMLInputElement>('pm-amount').value);
+  const dueDay = requireDueDay('pm-due');
+  if (dueDay == null) return;
   const mStr   = payMonthStr(payYear, payMonth);
   setLoading('pay-modal-save-btn', true);
   try {
     if (editingPaymentId) {
-      await updateDoc(userDoc('payments', editingPaymentId), { description: desc, amount });
+      await updateDoc(userDoc('payments', editingPaymentId), { description: desc, amount, dueDay });
     } else {
       await addDoc(userCol('payments'), {
-        description: desc, amount, month: mStr, paid: false, added: serverTimestamp(),
+        description: desc, amount, dueDay, month: mStr, paid: false, added: serverTimestamp(),
       });
     }
     closePaymentModal();
@@ -633,20 +456,38 @@ function openRecurringModal(id?: string): void {
   $<HTMLElement>('rec-modal-title').textContent = r ? 'Editar despesa fixa' : 'Nova despesa fixa';
   $<HTMLInputElement>('rec-name').value   = r?.name ?? '';
   $<HTMLInputElement>('rec-amount').value = r ? fmtBRL(r.amount) : '';
+  $<HTMLInputElement>('rec-due').value    = r?.dueDay ? String(r.dueDay) : '';
+  $<HTMLInputElement>('rec-variable').checked = !!r?.variable;
+  updateDueHint('rec');
+  updateRecVariable();
   openOverlay('rec-modal-overlay');
   setTimeout(() => $<HTMLInputElement>('rec-name').focus(), 60);
 }
 
+function updateRecVariable(): void {
+  const variable = $<HTMLInputElement>('rec-variable').checked;
+  const blank    = !parseBRL($<HTMLInputElement>('rec-amount').value);
+  $<HTMLInputElement>('rec-amount').placeholder = variable ? 'Estimativa (opcional)' : 'Opcional';
+  $<HTMLElement>('rec-var-hint').textContent = variable
+    ? 'Todo mês você informa o valor real quando a fatura chegar. Até lá, aparece como previsão.'
+    : blank ? 'Sem valor: você informa o valor em cada mês.' : '';
+}
+
+// Valor e vencimento são opcionais: o que ficar em branco é preenchido mês a mês.
 async function saveRecurringModal(): Promise<void> {
   const name = $<HTMLInputElement>('rec-name').value.trim();
   if (!name) { $<HTMLInputElement>('rec-name').focus(); return; }
-  const amount = parseBRL($<HTMLInputElement>('rec-amount').value);
+  const variable = $<HTMLInputElement>('rec-variable').checked;
+  const amount   = parseBRL($<HTMLInputElement>('rec-amount').value);
+  const dueDay   = readDueDay('rec-due');
   setLoading('rec-modal-save-btn', true);
   try {
     if (editingRecId) {
-      await updateDoc(userDoc('recurring', editingRecId), { name, amount });
+      await updateDoc(userDoc('recurring', editingRecId), { name, amount, variable, dueDay: dueDay ?? deleteField() });
     } else {
-      await addDoc(userCol('recurring'), { name, amount, added: serverTimestamp() });
+      const data: Record<string, unknown> = { name, amount, variable, added: serverTimestamp() };
+      if (dueDay) data['dueDay'] = dueDay;
+      await addDoc(userCol('recurring'), data);
     }
     closeRecurringModal();
   } catch {
@@ -664,6 +505,82 @@ async function deleteRecurring(id: string): Promise<void> {
   catch { showToast('Erro ao excluir'); }
 }
 
+// ─── Month modal (ajuste de uma despesa fixa só neste mês) ─────
+function monthDocFor(recId: string): Payment | undefined {
+  const mStr = payMonthStr(payYear, payMonth);
+  return payments.find(p => p.recurringId === recId && p.month === mStr);
+}
+
+function openMonthModal(recId: string): void {
+  const rec = recurring.find(x => x._id === recId);
+  if (!rec) return;
+  editingMonthRecId = recId;
+  const row   = monthSummary(getState()).rows.find(r => r.kind === 'rec' && r.id === recId);
+  const docu  = monthDocFor(recId);
+  const label = new Date(payYear, payMonth, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+  $<HTMLElement>('mo-modal-title').textContent = row?.estimated ? `Informar valor · ${rec.name}` : `Editar · ${rec.name}`;
+  $<HTMLElement>('mo-modal-sub').textContent = rec.variable
+    ? `${label}. Informe o valor real desta fatura; vale só para este mês.`
+    : `${label}. Vale só para este mês; nos outros meses continua R$ ${fmtBRL(rec.amount)}${rec.dueDay ? `, dia ${rec.dueDay}` : ''}.`;
+  $<HTMLInputElement>('mo-amount').value = row && row.amount ? fmtBRL(row.amount) : '';
+  $<HTMLInputElement>('mo-due').value    = row?.dueDay ? String(row.dueDay) : '';
+  updateDueHint('mo');
+  const hasOverride = !!docu && !docu.paid && (docu.edited === true || docu.amountConfirmed === true);
+  $<HTMLElement>('mo-reset-btn').style.display = hasOverride ? '' : 'none';
+  openOverlay('mo-modal-overlay');
+  setTimeout(() => $<HTMLInputElement>('mo-amount').focus(), 60);
+}
+
+async function saveMonthModal(): Promise<void> {
+  const rec = recurring.find(x => x._id === editingMonthRecId);
+  if (!rec) return;
+  const amount = parseBRL($<HTMLInputElement>('mo-amount').value);
+  const dueDay = readDueDay('mo-due');
+  if (!amount && !dueDay) {
+    showToast('Informe o valor ou o vencimento');
+    $<HTMLInputElement>('mo-amount').focus();
+    return;
+  }
+
+  // Campo em branco = mantém o padrão da despesa fixa (ou continua “a informar”).
+  const docu    = monthDocFor(rec._id);
+  const variable = !!rec.variable || !rec.amount;
+  const edited  = (amount > 0 && !variable && amount !== rec.amount) || (dueDay != null && dueDay !== rec.dueDay);
+  const fields: Record<string, unknown> = { edited };
+  if (amount) { fields['amount'] = amount; if (variable) fields['amountConfirmed'] = true; }
+  if (dueDay) fields['dueDay'] = dueDay;
+
+  setLoading('mo-save-btn', true);
+  try {
+    if (docu) {
+      if (!dueDay && docu.dueDay != null) fields['dueDay'] = deleteField();
+      await updateDoc(userDoc('payments', docu._id), fields);
+    } else {
+      await addDoc(userCol('payments'), {
+        description: rec.name, month: payMonthStr(payYear, payMonth), recurringId: rec._id,
+        paid: false, added: serverTimestamp(), ...fields,
+      });
+    }
+    closeMonthModal();
+  } catch {
+    showToast('Erro ao salvar');
+  } finally {
+    setLoading('mo-save-btn', false);
+  }
+}
+
+async function resetMonthOverride(): Promise<void> {
+  const docu = editingMonthRecId ? monthDocFor(editingMonthRecId) : undefined;
+  if (docu && !docu.paid) {
+    try { await deleteDoc(userDoc('payments', docu._id)); }
+    catch { showToast('Erro ao restaurar'); return; }
+  }
+  closeMonthModal();
+}
+
+function closeMonthModal(): void { closeOverlay('mo-modal-overlay'); editingMonthRecId = null; }
+
 // ─── List modal ────────────────────────────────────────────────
 function openListModal(id?: string): void {
   editingListId = id ?? null;
@@ -679,8 +596,6 @@ function openListModal(id?: string): void {
   openOverlay('list-modal-overlay');
   setTimeout(() => $<HTMLInputElement>('list-modal-name').focus(), 60);
 }
-
-function editList(id: string): void { openListModal(id); }
 
 function selectListEmoji(btn: HTMLButtonElement): void {
   selectedListEmoji = btn.dataset['emoji'] ?? '📋';
@@ -716,7 +631,7 @@ async function deleteList(id: string): Promise<void> {
     batch.delete(userDoc('lists', id));
     tasks.filter(t => t.listId === id).forEach(t => batch.delete(userDoc('tasks', t._id)));
     await batch.commit();
-    if (currentView === id) setView('pending');
+    if (filter === id) { filter = 'all'; renderAll(); }
   } catch {
     showToast('Erro ao excluir lista');
   }
@@ -732,7 +647,7 @@ if (themeIdx < 0) themeIdx = 0;
 
 function cycleTheme(): void {
   themeIdx = (themeIdx + 1) % themes.length;
-  const t = themes[themeIdx];
+  const t = themes[themeIdx]!;
   localStorage.setItem('birdy-theme', t);
   if (t === 'auto') {
     document.documentElement.removeAttribute('data-theme');
@@ -740,94 +655,68 @@ function cycleTheme(): void {
     document.documentElement.setAttribute('data-theme', t);
   }
   updateThemeIcon();
+  showToast(t === 'auto' ? 'Tema: automático' : t === 'light' ? 'Tema: claro' : 'Tema: escuro', 1400);
 }
 
 function updateThemeIcon(): void {
   const icons: Record<Theme, string> = {
     auto: 'ti-brightness-auto', light: 'ti-sun', dark: 'ti-moon',
   };
-  $<HTMLElement>('theme-icon').className = 'ti ' + icons[themes[themeIdx]];
+  const cls = 'ti js-theme-icon ' + icons[themes[themeIdx]!];
+  document.querySelectorAll<HTMLElement>('.js-theme-icon').forEach(el => { el.className = cls; });
 }
-
-updateThemeIcon();
 
 // ─── Keyboard shortcuts ────────────────────────────────────────
 document.addEventListener('keydown', (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
-    ['modal-overlay', 'pay-modal-overlay', 'rec-modal-overlay', 'list-modal-overlay']
+    ['modal-overlay', 'pay-modal-overlay', 'rec-modal-overlay', 'mo-modal-overlay', 'list-modal-overlay']
       .forEach(id => document.getElementById(id)?.classList.remove('open'));
   }
 });
 
 // ─── Expose to HTML onclick handlers ──────────────────────────
 type WindowExtensions = {
-  doLogout:            () => void;
-  setView:             (v: View) => void;
-  toggleQaNoteRow:     () => void;
-  closeQaNote:         () => void;
-  quickAdd:            () => void;
-  toggleDone:          (id: string) => void;
-  deleteTask:          (id: string) => void;
-  fabAction:           () => void;
-  saveModal:           () => void;
-  closeModal:          () => void;
-  handleOverlayClick:  (e: MouseEvent) => void;
-  shiftMonth:          (delta: number) => void;
-  toggleRecurringEdit: () => void;
-  toggleRecurringPaid: (recId: string, paymentId: string) => void;
-  toggleOneOffPaid:    (id: string) => void;
-  deletePayment:       (id: string) => void;
-  openPaymentModal:    (id?: string) => void;
-  savePaymentModal:    () => void;
-  closePaymentModal:   () => void;
+  setLayout:             (id: LayoutId) => void;
+  fabAction:             () => void;
+  saveModal:             () => void;
+  closeModal:            () => void;
+  handleOverlayClick:    (e: MouseEvent) => void;
+  savePaymentModal:      () => void;
+  closePaymentModal:     () => void;
   handlePayModalOverlay: (e: MouseEvent) => void;
-  openRecurringModal:  (id?: string) => void;
-  editRecurring:       (id: string) => void;
-  saveRecurringModal:  () => void;
-  closeRecurringModal: () => void;
-  deleteRecurring:     (id: string) => void;
-  openListModal:       (id?: string) => void;
-  editList:            (id: string) => void;
-  selectListEmoji:     (btn: HTMLButtonElement) => void;
-  saveList:            () => void;
-  deleteList:          (id: string) => void;
-  closeListModal:      () => void;
-  cycleTheme:          () => void;
-  maskBRL:             (input: HTMLInputElement) => void;
+  saveRecurringModal:    () => void;
+  closeRecurringModal:   () => void;
+  saveList:              () => void;
+  selectListEmoji:       (btn: HTMLButtonElement) => void;
+  closeListModal:        () => void;
+  maskBRL:               (input: HTMLInputElement) => void;
+  updateDueHint:         (kind: 'rec' | 'pay' | 'mo') => void;
+  updateRecVariable:     () => void;
+  saveMonthModal:        () => void;
+  closeMonthModal:       () => void;
+  resetMonthOverride:    () => void;
 };
 
 Object.assign(window, {
-  doLogout,
-  setView,
-  toggleQaNoteRow,
-  closeQaNote,
-  quickAdd,
-  toggleDone,
-  deleteTask,
+  setLayout,
   fabAction,
   saveModal,
   closeModal,
-  handleOverlayClick: (e: MouseEvent) => { if (e.target === $('modal-overlay')) closeModal(); },
-  shiftMonth,
-  toggleRecurringEdit,
-  toggleRecurringPaid,
-  toggleOneOffPaid,
-  deletePayment,
-  openPaymentModal,
+  handleOverlayClick:    (e: MouseEvent) => { if (e.target === $('modal-overlay')) closeModal(); },
   savePaymentModal,
   closePaymentModal,
   handlePayModalOverlay: (e: MouseEvent) => { if (e.target === $('pay-modal-overlay')) closePaymentModal(); },
-  openRecurringModal,
-  editRecurring: (id: string) => openRecurringModal(id),
   saveRecurringModal,
   closeRecurringModal,
-  deleteRecurring,
-  openListModal,
-  editList,
-  selectListEmoji,
   saveList,
-  deleteList,
+  selectListEmoji,
   closeListModal,
-  cycleTheme,
   maskBRL,
+  updateDueHint,
+  updateRecVariable,
+  saveMonthModal,
+  closeMonthModal,
+  resetMonthOverride,
 } satisfies WindowExtensions);
+
+syncLayoutSwitch();

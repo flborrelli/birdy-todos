@@ -10,6 +10,7 @@
     "useDefineForClassFields": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
+    "noEmit": true,
     "types": []
   },
   "include": ["src"]

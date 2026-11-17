@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <title>Birdy — ícone do app (passarinho colorido)</title>
+  <rect width="180" height="180" fill="#16131F"/>
+  <g transform="translate(21.6 20.7) scale(1.8)">
+    <g stroke="#F4ECD8" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M30 57v10M41 57v10" fill="none"/>
+      <polygon points="15,38 3,53 21,53" fill="#FF8FB1"/>
+      <rect x="14" y="32" width="38" height="26" rx="11" fill="#FFD23F" transform="rotate(-8 33 45)"/>
+      <polygon points="20,39 45,33 43,45 20,47" fill="#6EC1FF"/>
+      <circle cx="47" cy="24" r="14" fill="#FFD23F"/>
+      <polygon points="59,22 73,26 59,31" fill="#FF9F5A"/>
+    </g>
+    <circle cx="51" cy="22" r="3.6" fill="#121212"/>
+    <circle cx="52.3" cy="20.8" r="1.1" fill="#fff"/>
+  </g>
+</svg>
