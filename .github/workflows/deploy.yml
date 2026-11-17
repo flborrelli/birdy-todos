@@ -28,13 +28,6 @@ jobs:
           target: app
           channelId: live
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-
-      - name: Install Firebase Tools
-        run: npm install -g firebase-tools
-
-      - name: Deploy Firestore Rules
-        run: firebase deploy --only firestore:rules --project birdy---to-do-s
+      # As regras do Firestore não são publicadas aqui: a conta de serviço não tem
+      # permissão para isso (403 em serviceusage). Publique à mão quando mudar
+      # o firestore.rules:  npx firebase deploy --only firestore:rules
