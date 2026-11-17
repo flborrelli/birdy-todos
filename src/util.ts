@@ -133,8 +133,7 @@ export interface MonthSummary {
   overdueAmount:  number;
   next:           PayRow | null;
   undated:        number;
-  estimatedCount:  number;
-  estimatedAmount: number;
+  estimatedCount: number;   // despesas ainda sem valor informado: não entram nos totais
 }
 
 // Último valor real conhecido de uma despesa variável (mês mais recente anterior ao selecionado).
@@ -196,18 +195,19 @@ export function monthSummary(s: AppState): MonthSummary {
     return a.name.localeCompare(b.name, 'pt-BR');
   });
 
-  const total     = rows.reduce((a, r) => a + r.amount, 0);
-  const paid      = rows.filter(r => r.paid).reduce((a, r) => a + r.amount, 0);
+  // Os totais contam só o que já tem valor informado: despesas com valor ainda
+  // por informar (estimated) ficam de fora e são apenas avisadas (estimatedCount).
+  const informed  = rows.filter(r => !r.estimated);
+  const total     = informed.reduce((a, r) => a + r.amount, 0);
+  const paid      = informed.filter(r => r.paid).reduce((a, r) => a + r.amount, 0);
   const overdue   = rows.filter(r => r.status === 'overdue');
-  const estimated = rows.filter(r => r.estimated);
   return {
     rows, total, paid, left: total - paid,
     overdue,
-    overdueAmount: overdue.reduce((a, r) => a + r.amount, 0),
+    overdueAmount: overdue.filter(r => !r.estimated).reduce((a, r) => a + r.amount, 0),
     next:    rows.find(r => !r.paid && r.days != null && r.days >= 0) ?? null,
     undated: rows.filter(r => r.dueDay == null).length,
-    estimatedCount:  estimated.length,
-    estimatedAmount: estimated.reduce((a, r) => a + r.amount, 0),
+    estimatedCount: rows.length - informed.length,
   };
 }
 export interface MonthPoint {

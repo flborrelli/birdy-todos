@@ -317,7 +317,8 @@ export function mountC(root: HTMLElement, ctx: Ctx): Layout {
       return;
     }
 
-    const ratio = sum.total > 0 ? sum.paid / sum.total : 0;
+    const ratio   = sum.total > 0 ? sum.paid / sum.total : 0;
+    const missing = sum.estimatedCount;   // despesas sem valor informado: fora do total
     const dd = (r: PayRow): string => r.dueDate
       ? `<div class="c-dd ${r.status}"><b>${r.dueDate.getDate()}</b><span>${monthShort(r.dueDate)}</span></div>`
       : `<div class="c-dd none"><b>?</b><span>sem</span></div>`;
@@ -352,12 +353,12 @@ export function mountC(root: HTMLElement, ctx: Ctx): Layout {
       <div class="c-card c-meter">
         <div class="c-row"><div><small>Falta pagar</small><div class="c-big">${money(sum.left)}</div></div><div class="c-pct">${Math.round(ratio * 100)}% pago</div></div>
         <div class="c-bar"><i style="width:${(ratio * 100).toFixed(1)}%"></i></div>
+        ${missing ? `<p class="c-miss">🧾 Falta informar o valor de ${missing} outra${missing === 1 ? '' : 's'} despesa${missing === 1 ? '' : 's'}. ${missing === 1 ? 'Ela ainda não entra' : 'Elas ainda não entram'} no total.</p>` : ''}
       </div>
       <div class="c-tickets">
         ${openBlock}
         ${!overview && paidRows.length ? `<div class="c-sec">Pagas</div>${paidRows.map(ticket).join('')}` : ''}
         ${moreBtn}
-        ${!overview && sum.estimatedCount ? `<p class="c-hintl">🧾 ${sum.estimatedCount} despesa${sum.estimatedCount === 1 ? '' : 's'} aguardando o valor real${sum.estimatedAmount ? ` (previsão de ${money(sum.estimatedAmount)} já está no total)` : ''}. Toque em “informar valor”.</p>` : ''}
         ${!overview && sum.undated ? `<p class="c-hintl">📅 ${sum.undated} lançamento${sum.undated === 1 ? '' : 's'} sem vencimento. Toque no lápis (ou em “fixas”) e defina o dia.</p>` : ''}
       </div>
       <div class="c-total"><div><small>Total do mês</small><b class="c-mono">${money(sum.total)}</b></div><div style="text-align:right"><small>já pago</small><b class="c-mono sm">${money(sum.paid)}</b></div></div>`;
