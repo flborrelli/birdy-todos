@@ -1,6 +1,6 @@
 import type { AppState, Ctx } from './types';
 import {
-  escHtml, money, monthSummary, hashIndex, dueText, monthShort, cap,
+  escHtml, money, monthSummary, hashIndex, dueText, monthShort, cap, visibleTasks, filterListId,
   maskBRL, parseBRL, parseDueDay, dueDateFor, fmtDate, type PayRow,
 } from './util';
 import './mini.css';
@@ -27,7 +27,9 @@ export interface Mini {
 const COLORS    = ['#ffd23f', '#ff8fb1', '#b79cff', '#7ae582', '#ff9f5a', '#6ec1ff'];
 const MAX_TASKS = 12;
 const MAX_PAY   = 8;
-const TAB_KEY   = 'birdy-mini-tab';
+const TAB_KEY    = 'birdy-mini-tab';
+const FILTER_KEY = 'birdy-mini-filter';
+const DEFAULT_PH = 'O que precisa ser feito?';
 
 type Tab      = 'tasks' | 'pay';
 type FormKind = 'pay' | 'rec';
@@ -39,8 +41,9 @@ const SHELL = `
   </nav>
 
   <section class="m-pane" id="m-tasks">
+    <div class="m-chips" id="m-chips" role="group" aria-label="Listas" hidden></div>
     <div class="m-add">
-      <input id="m-tin" placeholder="O que precisa ser feito?" autocomplete="off">
+      <input id="m-tin" placeholder="${DEFAULT_PH}" autocomplete="off">
       <button class="m-plus" data-a="add-task" aria-label="Adicionar pendência"><i class="ti ti-plus"></i></button>
     </div>
     <ul class="m-list" id="m-tlist"></ul>
@@ -87,6 +90,10 @@ function readTab(): Tab {
   try { return localStorage.getItem(TAB_KEY) === 'pay' ? 'pay' : 'tasks'; } catch { return 'tasks'; }
 }
 
+function readFilter(): string {
+  try { return localStorage.getItem(FILTER_KEY) || 'all'; } catch { return 'all'; }
+}
+
 // Precisa ser chamada direto de um clique: o Chrome só abre a janela com um gesto do usuário.
 export async function createMini(ctx: Ctx, onClose: () => void): Promise<Mini> {
   const api = pipApi();
@@ -122,7 +129,10 @@ export function mountMini(win: Window, ctx: Ctx, onClose: () => void): Mini {
   const fhint  = q('#m-fhint');
   const addrow = q('#m-addrow');
 
+  const chips = q('#m-chips');
+
   let tab: Tab = readTab();
+  let filter   = readFilter();   // 'all' | 'none' | id da lista (próprio da mini janela, não mexe no app)
   let formKind: FormKind | null = null;
   let toastTimer: number | undefined;
 
@@ -143,13 +153,21 @@ export function mountMini(win: Window, ctx: Ctx, onClose: () => void): Mini {
     if (t === 'tasks') tin.focus();
   }
 
-  // ─── adicionar pendência ───
+  // ─── adicionar pendência (na lista escolhida, como no app) ───
   async function addTask(): Promise<void> {
     const title = tin.value.trim();
     if (!title) { tin.focus(); return; }
     tin.value = '';
-    await ctx.actions.addTask(title, '', null);
-    toast('Pendência adicionada');
+    const listId = filterListId(filter);
+    const list   = listId ? ctx.state().lists.find(l => l._id === listId) : undefined;
+    await ctx.actions.addTask(title, '', listId);
+    toast(list ? `Adicionada em ${list.name}` : 'Pendência adicionada');
+  }
+
+  function setFilter(f: string): void {
+    filter = f;
+    try { localStorage.setItem(FILTER_KEY, f); } catch { /* segue sem lembrar a lista */ }
+    renderTasks(ctx.state());
   }
   tin.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); void addTask(); } }, opts);
 
@@ -217,6 +235,7 @@ export function mountMini(win: Window, ctx: Ctx, onClose: () => void): Mini {
     switch (el.dataset['a']) {
       case 'tab':        setTab(el.dataset['t'] === 'pay' ? 'pay' : 'tasks'); break;
       case 'add-task':   void addTask(); break;
+      case 'filter':     setFilter(el.dataset['f'] ?? 'all'); break;
       case 'done':       A.toggleDone(id); break;
       case 'month':      A.shiftMonth(Number(el.dataset['d'] ?? 0)); break;
       case 'pay':
@@ -229,18 +248,42 @@ export function mountMini(win: Window, ctx: Ctx, onClose: () => void): Mini {
   }, opts);
 
   // ─── render ───
+  const listColor = (id: string): string => COLORS[hashIndex(id, COLORS.length)] ?? '#ffd23f';
+
   function renderTasks(s: AppState): void {
-    const open  = s.tasks.filter(t => !t.done);
-    const shown = open.slice(0, MAX_TASKS);
-    q('#m-n-tasks').textContent = String(open.length);
+    const all = s.tasks.filter(t => !t.done);
+    // Lista apagada (ou ainda sem listas): volta para "Todas".
+    if (filter !== 'all' && filter !== 'none' && !s.lists.some(l => l._id === filter)) filter = 'all';
+    const vis   = visibleTasks({ ...s, filter }).filter(t => !t.done);
+    const shown = vis.slice(0, MAX_TASKS);
+    q('#m-n-tasks').textContent = String(all.length);
+
+    // Divisão por listas (TRABALHO, CASA…), igual ao painel do app: Todas · Geral · uma por lista.
+    chips.hidden = s.lists.length === 0;
+    const chip = (id: string, emoji: string, name: string, color: string, n: number): string =>
+      `<button class="m-chip${filter === id ? ' on' : ''}" style="--c:${color}" data-a="filter" data-f="${escHtml(id)}">
+         <span>${emoji}</span>${escHtml(name)}<i>${n}</i></button>`;
+    chips.innerHTML =
+      chip('all',  '📌', 'Todas', '#6ec1ff', all.length) +
+      chip('none', '📥', 'Geral', '#f4ecd8', all.filter(t => !t.listId).length) +
+      s.lists.map(l => chip(l._id, escHtml(l.emoji ?? '📋'), l.name, listColor(l._id), all.filter(t => t.listId === l._id).length)).join('');
+
+    const current = filter !== 'all' && filter !== 'none' ? s.lists.find(l => l._id === filter) : undefined;
+    tin.placeholder = current ? `Nova pendência em ${current.name}` : DEFAULT_PH;
+
     q('#m-tlist').innerHTML = shown.length
-      ? shown.map(t => `
-          <li class="m-t" style="--bar:${COLORS[hashIndex(t._id, COLORS.length)] ?? '#ffd23f'}">
+      ? shown.map(t => {
+          const lst  = t.listId ? s.lists.find(l => l._id === t.listId) : undefined;
+          const pill = filter === 'all' && lst
+            ? `<span class="m-pill" style="--c:${listColor(lst._id)}">${escHtml(lst.emoji ?? '')} ${escHtml(lst.name)}</span>` : '';
+          return `
+          <li class="m-t" style="--bar:${lst ? listColor(lst._id) : '#ffd23f'}">
             <button class="m-chk" data-a="done" data-id="${escHtml(t._id)}" aria-label="Concluir: ${escHtml(t.title)}"></button>
-            <span>${escHtml(t.title)}</span>
-          </li>`).join('')
-        + (open.length > shown.length ? `<li class="m-more">+${open.length - shown.length} no app completo</li>` : '')
-      : '<li class="m-empty">Nenhuma pendência. Que paz!</li>';
+            <span class="m-tt">${escHtml(t.title)}</span>${pill}
+          </li>`;
+        }).join('')
+        + (vis.length > shown.length ? `<li class="m-more">+${vis.length - shown.length} no app completo</li>` : '')
+      : `<li class="m-empty">${filter === 'all' ? 'Nenhuma pendência. Que paz!' : 'Nada pendente nesta lista.'}</li>`;
   }
 
   function payRow(r: PayRow): string {
