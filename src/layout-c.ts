@@ -1,6 +1,6 @@
 import type { AppState, Ctx, Layout } from './types';
 import {
-  escHtml, money, monthSummary, visibleTasks, filterListId, hashIndex, cap, dueText, monthShort, syncFab,
+  escHtml, money, monthSummary, visibleTasks, filterListId, hashIndex, cap, dueText, monthShort, syncFab, miniSupported,
   type MonthSummary, type PayRow,
 } from './util';
 import './layout-c.css';
@@ -52,6 +52,7 @@ const SHELL = `
       <div class="c-stk blue"><small>a pagar</small><b class="c-mono" id="c-sleft">R$ 0</b></div>
       <div class="c-stk date" id="c-date"></div>
       <div class="c-tools">
+        <button class="c-tbtn" id="c-mini-btn" data-a="mini" title="Mini janela flutuante" aria-label="Abrir mini janela flutuante"><i class="ti ti-picture-in-picture"></i></button>
         <button class="c-tbtn" data-a="theme" title="Alternar tema" aria-label="Alternar tema"><i class="ti ti-brightness-auto js-theme-icon"></i></button>
         <button class="c-tbtn" data-a="logout" title="Sair" aria-label="Sair"><i class="ti ti-logout"></i></button>
       </div>
@@ -92,6 +93,9 @@ export function mountC(root: HTMLElement, ctx: Ctx): Layout {
   const qin    = q<HTMLInputElement>('#c-qin');
   const qnote  = q('#c-qnote');
   const qnin   = q<HTMLInputElement>('#c-qnin');
+
+  // Navegadores sem Picture-in-Picture de documento (Firefox, Safari, celular) não mostram o botão.
+  if (!miniSupported()) q('#c-mini-btn').style.display = 'none';
 
   const board = q('#c-board');
   let view: View = 'all';
@@ -176,6 +180,7 @@ export function mountC(root: HTMLElement, ctx: Ctx): Layout {
       case 'new-list':   A.openListModal(); break;
       case 'edit-list':  A.openListModal(id); break;
       case 'del-list':   A.deleteList(id); break;
+      case 'mini':       A.openMini(); break;
       case 'theme':      A.cycleTheme(); break;
       case 'logout':     A.logout(); break;
     }

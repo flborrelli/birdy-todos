@@ -63,6 +63,8 @@ export interface AppActions {
   toggleOneOffPaid:    (id: string) => void;
   deletePayment:       (id: string) => void;
   addOneOffPayment:    (description: string, amount: number, dueDay: number) => Promise<void>;
+  addRecurring:        (name: string, amount: number, dueDay: number | null) => Promise<void>;
+  openMini:            () => void;
   shiftMonth:          (delta: number) => void;
   toggleManage:        () => void;
   openTaskModal:       () => void;

@@ -19,6 +19,7 @@ import {
   parseDueDay, dueDateFor, fmtDate, monthSummary,
 } from './util';
 import { mountC } from './layout-c';
+import { createMini, type Mini } from './mini';
 
 // ─── Firebase ──────────────────────────────────────────────────
 const firebaseConfig = {
@@ -54,6 +55,8 @@ let editingRecId:      string | null = null;
 let editingMonthRecId: string | null = null;
 
 let layout: Layout | null = null;
+let mini:   Mini | null   = null;
+let miniOpening           = false;
 
 // ─── Helpers ──────────────────────────────────────────────────
 function $<T extends HTMLElement>(id: string): T {
@@ -106,6 +109,8 @@ const actions: AppActions = {
   toggleOneOffPaid:    id => { void toggleOneOffPaid(id); },
   deletePayment:       id => { void deletePayment(id); },
   addOneOffPayment,
+  addRecurring,
+  openMini:            () => { void openMiniWindow(); },
   shiftMonth,
   toggleManage:        () => { recurringEditMode = !recurringEditMode; renderAll(); },
   openTaskModal,
@@ -140,7 +145,28 @@ function unmountLayout(): void {
 function renderAll(): void {
   if (filter !== 'all' && filter !== 'none' && !lists.some(l => l._id === filter)) filter = 'all';
   layout?.update();
+  mini?.update();
   updateThemeIcon();
+}
+
+// Mini janela flutuante: precisa ser chamada direto de um clique (exigência do Chrome).
+async function openMiniWindow(): Promise<void> {
+  if (mini) { mini.focus(); return; }
+  if (miniOpening) return;
+  miniOpening = true;
+  try {
+    mini = await createMini(ctx, () => { mini = null; });
+  } catch {
+    showToast('Não foi possível abrir a mini janela');
+  } finally {
+    miniOpening = false;
+  }
+}
+
+function closeMini(): void {
+  const m = mini;
+  mini = null;
+  m?.destroy();
 }
 
 function setSyncState(state: SyncInfo['state'], label: string): void {
@@ -175,6 +201,7 @@ onAuthStateChanged(auth, (user: User | null) => {
     $<HTMLElement>('login-screen').style.display  = 'flex';
     $<HTMLElement>('main-app').style.display     = 'none';
     $<HTMLElement>('fab').style.display          = 'none';
+    closeMini();
     unmountLayout();
     tasks = []; lists = []; recurring = []; payments = [];
   }
@@ -348,6 +375,15 @@ async function addOneOffPayment(description: string, amount: number, dueDay: num
     await addDoc(userCol('payments'), {
       description, amount, dueDay, month: payMonthStr(payYear, payMonth), paid: false, added: serverTimestamp(),
     });
+  } catch { showToast('Erro ao adicionar'); }
+}
+
+// Despesa fixa criada fora do modal (mini janela): valor e vencimento são opcionais.
+async function addRecurring(name: string, amount: number, dueDay: number | null): Promise<void> {
+  try {
+    const data: Record<string, unknown> = { name, amount, variable: false, added: serverTimestamp() };
+    if (dueDay) data['dueDay'] = dueDay;
+    await addDoc(userCol('recurring'), data);
   } catch { showToast('Erro ao adicionar'); }
 }
 

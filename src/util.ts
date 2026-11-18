@@ -52,6 +52,11 @@ export function syncFab(view: string): void {
   fab.title = label;
 }
 
+// A mini janela flutuante usa a API Document Picture-in-Picture (Chrome/Edge 116+).
+export function miniSupported(): boolean {
+  return 'documentPictureInPicture' in window;
+}
+
 export function filterListId(f: Filter): string | null {
   return f === 'all' || f === 'none' ? null : f;
 }
