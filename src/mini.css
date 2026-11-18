@@ -47,13 +47,15 @@
   flex: none; padding: 1px 8px; background: var(--c, var(--y)); color: #121212; border: 2px solid var(--c-ink);
   border-radius: 99px; font-size: 11px; font-weight: 800; white-space: nowrap;
 }
-.m-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Uma linha só: as listas dividem a largura; se forem muitas, a linha rola de lado. */
+.m-chips { display: flex; flex-wrap: nowrap; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.m-chips::-webkit-scrollbar { display: none; }
 .m-chip {
-  display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; background: var(--c-paper);
+  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 3px; padding: 3px 6px; background: var(--c-paper);
   border: 2px solid var(--c-ink); border-radius: 99px; font-size: 12px; font-weight: 800; white-space: nowrap;
 }
 .m-chip.on { background: var(--c, var(--y)); color: #121212; }
-.m-chip i { font-style: normal; padding: 0 5px; border: 2px solid currentColor; border-radius: 99px; font-size: 11px; }
+.m-chip i { font-style: normal; padding: 0 3px; border: 1.5px solid currentColor; border-radius: 99px; font-size: 11px; }
 .m-chk { width: 20px; height: 20px; flex: none; border: 2px solid var(--c-ink); border-radius: 6px; background: var(--c-input); }
 .m-chk:hover { background: var(--g); }
 .m-more { text-align: center; font-size: 12px; font-weight: 700; color: var(--c-sub2); }
