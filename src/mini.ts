@@ -132,7 +132,7 @@ export function mountMini(win: Window, ctx: Ctx, onClose: () => void): Mini {
   const chips = q('#m-chips');
 
   let tab: Tab = readTab();
-  let filter   = readFilter();   // 'all' | 'none' | id da lista (próprio da mini janela, não mexe no app)
+  let filter   = readFilter();   // 'all' | id da lista (próprio da mini janela, não mexe no app)
   let formKind: FormKind | null = null;
   let toastTimer: number | undefined;
 
@@ -253,22 +253,21 @@ export function mountMini(win: Window, ctx: Ctx, onClose: () => void): Mini {
   function renderTasks(s: AppState): void {
     const all = s.tasks.filter(t => !t.done);
     // Lista apagada (ou ainda sem listas): volta para "Todas".
-    if (filter !== 'all' && filter !== 'none' && !s.lists.some(l => l._id === filter)) filter = 'all';
+    if (filter !== 'all' && !s.lists.some(l => l._id === filter)) filter = 'all';
     const vis   = visibleTasks({ ...s, filter }).filter(t => !t.done);
     const shown = vis.slice(0, MAX_TASKS);
     q('#m-n-tasks').textContent = String(all.length);
 
-    // Divisão por listas (TRABALHO, CASA…), igual ao painel do app: Todas · Geral · uma por lista.
+    // Divisão por listas (TRABALHO, CASA…), igual ao painel do app: Todas · uma por lista.
     chips.hidden = s.lists.length === 0;
     const chip = (id: string, emoji: string, name: string, color: string, n: number): string =>
       `<button class="m-chip${filter === id ? ' on' : ''}" style="--c:${color}" data-a="filter" data-f="${escHtml(id)}">
          <span>${emoji}</span>${escHtml(name)}<i>${n}</i></button>`;
     chips.innerHTML =
       chip('all',  '📌', 'Todas', '#6ec1ff', all.length) +
-      chip('none', '📥', 'Geral', '#f4ecd8', all.filter(t => !t.listId).length) +
       s.lists.map(l => chip(l._id, escHtml(l.emoji ?? '📋'), l.name, listColor(l._id), all.filter(t => t.listId === l._id).length)).join('');
 
-    const current = filter !== 'all' && filter !== 'none' ? s.lists.find(l => l._id === filter) : undefined;
+    const current = filter !== 'all' ? s.lists.find(l => l._id === filter) : undefined;
     tin.placeholder = current ? `Nova pendência em ${current.name}` : DEFAULT_PH;
 
     q('#m-tlist').innerHTML = shown.length

@@ -250,7 +250,6 @@ export function mountC(root: HTMLElement, ctx: Ctx): Layout {
       </div>`;
     q('#c-lists').innerHTML = `<h3>Listas</h3>` +
       chip('all',  '📌', 'Todas', '#6ec1ff', '1deg',   open.length, false) +
-      chip('none', '📥', 'Geral', '#f4ecd8', '-1deg',  open.filter(t => !t.listId).length, false) +
       s.lists.map(l => {
         const i = hashIndex(l._id, COLORS.length);
         return chip(l._id, escHtml(l.emoji ?? '📋'), l.name, COLORS[i]!, TILTS[i]!, open.filter(t => t.listId === l._id).length, true);

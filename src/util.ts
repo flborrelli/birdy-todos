@@ -58,12 +58,11 @@ export function miniSupported(): boolean {
 }
 
 export function filterListId(f: Filter): string | null {
-  return f === 'all' || f === 'none' ? null : f;
+  return f === 'all' ? null : f;
 }
 
 export function visibleTasks(s: AppState): Task[] {
-  if (s.filter === 'all')  return s.tasks;
-  if (s.filter === 'none') return s.tasks.filter(t => !t.listId);
+  if (s.filter === 'all') return s.tasks;
   return s.tasks.filter(t => t.listId === s.filter);
 }
 

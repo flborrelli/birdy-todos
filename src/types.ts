@@ -33,7 +33,7 @@ export interface Payment {
   amountConfirmed?: boolean;
 }
 
-// 'all' = todas · 'none' = sem lista · qualquer outro valor = id de uma lista
+// 'all' = todas · qualquer outro valor = id de uma lista
 export type Filter = string;
 
 export interface SyncInfo {

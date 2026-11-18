@@ -143,7 +143,7 @@ function unmountLayout(): void {
 }
 
 function renderAll(): void {
-  if (filter !== 'all' && filter !== 'none' && !lists.some(l => l._id === filter)) filter = 'all';
+  if (filter !== 'all' && !lists.some(l => l._id === filter)) filter = 'all';
   layout?.update();
   mini?.update();
   updateThemeIcon();
